@@ -147,7 +147,6 @@ public class ImageLoader {
 	}
 	
 	public static DoubleMatrix sample(int patchSize, int numPatches, DoubleMatrix images, int width, int height, int channels) {
-		System.out.println(images.rows+"x"+images.columns);
 		Random rand = new Random();
 		DoubleMatrix patches = null;
 		for(int i = 0; i < numPatches; i++) {

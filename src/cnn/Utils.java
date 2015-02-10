@@ -16,7 +16,7 @@ public class Utils {
 
 	public static DoubleMatrix calculateZCAWhite(DoubleMatrix input, DoubleMatrix meanPatch, double epsilon) {
 		DoubleMatrix sigma = input.subRowVector(meanPatch);
-		sigma = sigma.transpose().mmul(sigma);
+        sigma = sigma.transpose().mmul(sigma);
 		sigma.divi(input.rows);
 		DoubleMatrix[] svd = Singular.fullSVD(sigma);
 		DoubleMatrix ZCAWhite = svd[1];

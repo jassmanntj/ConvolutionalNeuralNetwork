@@ -40,7 +40,7 @@ import cnn.SparseAutoencoder;
 import cnn.Utils;
 
 public class LeafCNN {
-	private static final boolean load = true;
+	private static final boolean load = false;
 	DoubleMatrix images;
 	DoubleMatrix photoTrain;
 	DoubleMatrix labels;
@@ -57,8 +57,8 @@ public class LeafCNN {
 	public void run() throws Exception {
 		int patchSize = 11;
 		int poolSize = 10;
-		int numPatches = 64;
-		int hiddenSize = 200;
+		int numPatches = 128;
+		//int hiddenSize = 200;
 		int imageRows = 80;
 		int imageColumns = 60;
 		double sparsityParam = 0.035;
@@ -66,14 +66,23 @@ public class LeafCNN {
 		double beta = 5;
 		double alpha = 0.5;
 		int channels = 3;
-		String resFile = "Final"+patchSize+"."+numPatches+"."+poolSize+"."+hiddenSize;
+
+        //CL2
+        int patchSize2 = 2;
+        int poolSize2 = 2;
+        int numPatches2 = 64;
+        int imageRows2 = (imageRows-patchSize+1)/poolSize;
+        int imageColumns2 = (imageColumns-patchSize+1)/poolSize;
+        int channels2 = numPatches;
+
+        String resFile = "Final"+patchSize+"."+numPatches+"."+poolSize+"."+patchSize2+"."+numPatches2+"."+poolSize2+".";
 		
 		ImageLoader loader = new ImageLoader();
 		File folder = new File("C:/Users/jassmanntj/Desktop/TrainSort");
 		HashMap<String, Double> labelMap = loader.getLabelMap(folder);
 		
 		if(!load) {
-			loader.loadFolder(folder, 3, 60, 80, labelMap);
+			loader.loadFolder(folder, channels, imageColumns, imageRows, labelMap);
 			images = loader.getImages();
 			photoTrain = loader.getPhotoImages();
 			labels = loader.getLabels();
@@ -91,11 +100,12 @@ public class LeafCNN {
 		}
 
 		ConvolutionLayer cl = new ConvolutionLayer(channels, patchSize, imageRows, imageColumns, poolSize, numPatches, sparsityParam, lambda, beta, alpha, true);
-		SparseAutoencoder ae2 = new SparseAutoencoder(cl.getOutputSize(), hiddenSize, cl.getOutputSize(), sparsityParam, lambda, beta, alpha);
+		ConvolutionLayer cl2 = new ConvolutionLayer(channels2, patchSize2, imageRows2, imageColumns2, poolSize2, numPatches2, sparsityParam, lambda, beta, alpha, true);
+		//SparseAutoencoder ae2 = new SparseAutoencoder(cl.getOutputSize(), hiddenSize, cl.getOutputSize(), sparsityParam, lambda, beta, alpha);
 		SoftmaxClassifier sc = new SoftmaxClassifier(1e-4);
-		SparseAutoencoder[] saes = {ae2};
-		DeepNN dn = new DeepNN(saes, sc);
-		NeuralNetworkLayer[] nnl = {cl, dn};
+		//SparseAutoencoder[] saes = {ae2};
+		//DeepNN dn = new DeepNN(saes, sc);
+		NeuralNetworkLayer[] nnl = {cl, cl2, sc};
 		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(nnl, resFile);
 		
 		DoubleMatrix result = cnn.train(images, labels, 3200);
@@ -105,7 +115,7 @@ public class LeafCNN {
 
 		folder = new File("C:/Users/jassmanntj/Desktop/TestSort");
 		if(!load) {
-			loader.loadFolder(folder,3,60, 80,labelMap);
+			loader.loadFolder(folder,channels,imageColumns, imageRows,labelMap);
 			testImages = loader.getImages();
 			testLabels = loader.getLabels();
 			photoTest = loader.getPhotoImages();

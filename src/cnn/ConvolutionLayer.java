@@ -44,6 +44,7 @@ public class ConvolutionLayer extends NeuralNetworkLayer {
 		this.beta = beta;
 		this.alpha = alpha;
 		this.whiten = whiten;
+        this.patchSize = patchDim*patchDim;
 	}
 	
 	public ConvolutionLayer(String filename) {
@@ -86,7 +87,6 @@ public class ConvolutionLayer extends NeuralNetworkLayer {
 		int numFeatures = whitenedTheta.columns;
 		this.resultRows = (imageRows-patchDim+1)/poolDim;
 		this.resultCols = (imageCols-patchDim+1)/poolDim;
-		this.patchSize = patchDim*patchDim;
 		this.imageSize = imageRows*imageCols;
 		this.pooledFeatures = new DoubleMatrix(images.rows, numFeatures * (resultRows * resultCols));
 		ExecutorService executor = Executors.newFixedThreadPool(NUMTHREADS);
@@ -192,6 +192,8 @@ public class ConvolutionLayer extends NeuralNetworkLayer {
 				}
 			}
 			line = reader.readLine().split(",");
+            whitenedBias = new DoubleMatrix(Integer.parseInt(line[0]), Integer.parseInt(line[1]));
+            line = reader.readLine().split(",");
 			for(int i = 0; i < whitenedBias.rows; i++) {
 				for(int j = 0; j < whitenedBias.columns; j++) {
 					whitenedBias.put(i, j, Double.parseDouble(line[i * whitenedBias.columns + j]));
@@ -251,8 +253,8 @@ public class ConvolutionLayer extends NeuralNetworkLayer {
 
 	@Override
 	public DoubleMatrix train(DoubleMatrix input, DoubleMatrix output, int iterations) {
-		LinearDecoder ae = new LinearDecoder(patchSize, channels, numPatches, sparsityParam, lambda, beta, alpha);
-		DoubleMatrix patches = ImageLoader.sample(patchSize, numPatches, input, imageCols, imageRows, channels);
+		LinearDecoder ae = new LinearDecoder(patchDim, channels, numPatches, sparsityParam, lambda, beta, alpha);
+		DoubleMatrix patches = ImageLoader.sample(patchDim, 100000, input, imageCols, imageRows, channels);
 		if(whiten) {
 			patches.divi(patches.max());
 			DoubleMatrix meanPatch = patches.columnMeans();
