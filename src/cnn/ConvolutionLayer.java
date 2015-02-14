@@ -30,7 +30,6 @@ public class ConvolutionLayer extends NeuralNetworkLayer {
 	private int resultCols;
 	private boolean whiten;
 	private DoubleMatrix images;
-	private static final int NUMTHREADS = 8;
 	
 	public ConvolutionLayer(int channels, int patchDim, int imageRows, int imageCols, int poolDim, int numPatches, double sparsityParam, double lambda, double beta, double alpha, boolean whiten) {
 		this.channels = channels;
@@ -89,7 +88,7 @@ public class ConvolutionLayer extends NeuralNetworkLayer {
 		this.resultCols = (imageCols-patchDim+1)/poolDim;
 		this.imageSize = imageRows*imageCols;
 		this.pooledFeatures = new DoubleMatrix(images.rows, numFeatures * (resultRows * resultCols));
-		ExecutorService executor = Executors.newFixedThreadPool(NUMTHREADS);
+		ExecutorService executor = Executors.newFixedThreadPool(Utils.NUMTHREADS);
 		for(int imageNum = 0; imageNum < images.rows; imageNum++) {
 			Runnable worker = new ConvolutionThread(imageNum);
 			executor.execute(worker);

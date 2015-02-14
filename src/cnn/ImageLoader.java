@@ -9,6 +9,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Random;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import javax.imageio.ImageIO;
 
@@ -41,7 +43,6 @@ public class ImageLoader {
 		this.photoNames = new ArrayList<String>();
 		this.names = new ArrayList<String>();
 		for(File leaf : folder.listFiles()) {
-			leaf.listFiles();
 			if(leaf.isDirectory()) {
 				System.out.println(z++ +":"+leaf.getName());
 				for(File photos : leaf.listFiles()) {
@@ -146,7 +147,7 @@ public class ImageLoader {
 		return photoNames;
 	}
 	
-	public static DoubleMatrix sample(int patchSize, int numPatches, DoubleMatrix images, int width, int height, int channels) {
+	public static DoubleMatrix sampleS(int patchSize, int numPatches, DoubleMatrix images, int width, int height, int channels) {
 		Random rand = new Random();
 		DoubleMatrix patches = null;
 		for(int i = 0; i < numPatches; i++) {
@@ -176,10 +177,62 @@ public class ImageLoader {
 				patches = DoubleMatrix.concatVertically(patches, patch);
 			}
 		}
-		return patches;
+		return normalizeData(patches);
 	}
+
+    public static DoubleMatrix sample(final int patchSize, final int numPatches, final DoubleMatrix images, final int width, final int height, final int channels) {
+        DoubleMatrix patches = new DoubleMatrix(numPatches, patchSize*patchSize*channels);
+        class Patcher implements Runnable {
+            private int threadNo;
+            private DoubleMatrix patches;
+
+            public Patcher(int threadNo, DoubleMatrix patches) {
+                this.threadNo = threadNo;
+                this.patches = patches;
+            }
+
+            @Override
+            public void run() {
+                int count = numPatches / Utils.NUMTHREADS;
+                for (int i = 0; i < count; i++) {
+                    if(i%500 == 0)
+                        System.out.println(threadNo+":"+i);
+                    Random rand = new Random();
+                    int randomImage = rand.nextInt(images.rows);
+                    int randomY = rand.nextInt(height - patchSize + 1);
+                    int randomX = rand.nextInt(width - patchSize + 1);
+                    int imageSize = width * height;
+                    DoubleMatrix patch = null;
+                    for (int j = 0; j < channels; j++) {
+                        DoubleMatrix channel = images.getRange(randomImage, randomImage + 1, j * imageSize, (j + 1) * imageSize);
+                        channel = channel.reshape(width, height);
+                        channel = channel.getRange(randomY, randomY + patchSize, randomX, randomX + patchSize);
+                        channel = channel.reshape(1, patchSize * patchSize);
+                        if (patch == null) {
+                            patch = channel;
+                        } else {
+                            patch = DoubleMatrix.concatHorizontally(patch, channel);
+                        }
+                    }
+                    patches.putRow(threadNo * count + i, patch);
+                }
+            }
+        }
+        ExecutorService executor = Executors.newFixedThreadPool(Utils.NUMTHREADS);
+        for(int i = 0; i < Utils.NUMTHREADS; i++) {
+            if (i % 1000 == 0)
+                System.out.println(i);
+            Runnable patcher = new Patcher(i, patches);
+            executor.execute(patcher);
+        }
+        executor.shutdown();
+        while(!executor.isTerminated());
+        return normalizeData(patches);
+    }
+
+
 	
-	public DoubleMatrix normalizeData(DoubleMatrix data) {
+	public static DoubleMatrix normalizeData(DoubleMatrix data) {
 		DoubleMatrix mean = data.rowMeans();
 		data.subiColumnVector(mean);
 		DoubleMatrix squareData = data.mul(data);

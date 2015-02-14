@@ -13,9 +13,9 @@ import org.jblas.Singular;
 import org.jtransforms.fft.DoubleFFT_2D;
 
 public class Utils {
-
+    public static final int NUMTHREADS = 8;
 	public static DoubleMatrix calculateZCAWhite(DoubleMatrix input, DoubleMatrix meanPatch, double epsilon) {
-		DoubleMatrix sigma = input.subRowVector(meanPatch);
+        DoubleMatrix sigma = input.subRowVector(meanPatch);
         sigma = sigma.transpose().mmul(sigma);
 		sigma.divi(input.rows);
 		DoubleMatrix[] svd = Singular.fullSVD(sigma);

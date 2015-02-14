@@ -21,6 +21,7 @@ package cnn.execute;
  * Final11.8.10.200 - xxxx xxxx
  * Final11.64.10.200 - 100% 28/7/5% 5/5/4% err saving
  * Final11.32.10.200
+ * Final11.256.10.2.64.2(11.256.10---) 100% 28/7/5% 7/4/4%
  */
 import java.io.BufferedWriter;
 import java.io.File;
@@ -57,7 +58,7 @@ public class LeafCNN {
 	public void run() throws Exception {
 		int patchSize = 11;
 		int poolSize = 10;
-		int numPatches = 128;
+		int numPatches = 256;
 		//int hiddenSize = 200;
 		int imageRows = 80;
 		int imageColumns = 60;
@@ -78,7 +79,7 @@ public class LeafCNN {
         String resFile = "Final"+patchSize+"."+numPatches+"."+poolSize+"."+patchSize2+"."+numPatches2+"."+poolSize2+".";
 		
 		ImageLoader loader = new ImageLoader();
-		File folder = new File("C:/Users/jassmanntj/Desktop/TrainSort");
+		File folder = new File("C:/Users/jassmanntj/Desktop/TrainRot5.0");
 		HashMap<String, Double> labelMap = loader.getLabelMap(folder);
 		
 		if(!load) {
@@ -100,18 +101,20 @@ public class LeafCNN {
 		}
 
 		ConvolutionLayer cl = new ConvolutionLayer(channels, patchSize, imageRows, imageColumns, poolSize, numPatches, sparsityParam, lambda, beta, alpha, true);
-		ConvolutionLayer cl2 = new ConvolutionLayer(channels2, patchSize2, imageRows2, imageColumns2, poolSize2, numPatches2, sparsityParam, lambda, beta, alpha, true);
+		//ConvolutionLayer cl2 = new ConvolutionLayer(channels2, patchSize2, imageRows2, imageColumns2, poolSize2, numPatches2, sparsityParam, lambda, beta, alpha, true);
 		//SparseAutoencoder ae2 = new SparseAutoencoder(cl.getOutputSize(), hiddenSize, cl.getOutputSize(), sparsityParam, lambda, beta, alpha);
 		SoftmaxClassifier sc = new SoftmaxClassifier(1e-4);
 		//SparseAutoencoder[] saes = {ae2};
 		//DeepNN dn = new DeepNN(saes, sc);
-		NeuralNetworkLayer[] nnl = {cl, cl2, sc};
+		NeuralNetworkLayer[] nnl = {cl, sc};
 		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(nnl, resFile);
 		
 		DoubleMatrix result = cnn.train(images, labels, 3200);
 		int[][] results = Utils.computeResults(result);
+        System.out.println("RESULT: "+result.rows+"X"+result.columns);
 		System.out.println("TRAIN");
-		
+        compareResults(results, labels);
+		/*
 
 		folder = new File("C:/Users/jassmanntj/Desktop/TestSort");
 		if(!load) {
@@ -133,9 +136,9 @@ public class LeafCNN {
 		}
 		
 		DoubleMatrix testRes = cnn.computeRes(testImages);
-		int[][] testResult = cnn.compute(testImages);
+		int[][] testResult = Utils.computeResults(testRes);
 		DoubleMatrix photoTestRes = cnn.computeRes(photoTest);
-		int[][] photoTestResult = cnn.compute(photoTest);
+		int[][] photoTestResult = Utils.computeResults(photoTestRes);
 		System.out.println("TRAIN");
 		compareResults(results, labels);
 		System.out.println("TEST");
@@ -145,14 +148,16 @@ public class LeafCNN {
 		writeResults(testRes, testLabels, fileNames, resFile);
 		System.out.println("PHOTOTEST");
 		compareResults(photoTestResult, photoTestLabels);
-		writeResults(photoTestRes, photoTestLabels, photoFiles, "Photo"+resFile);
+		writeResults(photoTestRes, photoTestLabels, photoFiles, "Photo"+resFile);*/
 	}
 	
 	public void compareResults(int[][] result, DoubleMatrix labels) {
 		double sum1 = 0;
 		double sum2 = 0;
 		double sum3 = 0;
+        System.out.println(labels.rows+":"+labels.columns);
 		for(int i = 0; i < result.length; i++) {
+            System.out.println(result[i][0]+":"+result[i][1]+":"+result[i][2]);
 			sum1 += labels.get(i, result[i][0]);
 			sum2 += labels.get(i, result[i][1]);
 			sum3 += labels.get(i, result[i][2]);
