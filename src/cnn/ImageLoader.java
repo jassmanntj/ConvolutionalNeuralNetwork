@@ -269,9 +269,11 @@ public class ImageLoader {
 		HashMap<String, Double> labelMap = new HashMap<String, Double>();
 		double labelNo = -1;
 		for(File leaf : folder.listFiles()) {
-			labelNo++;
-			leaf.listFiles();
-			labelMap.put(leaf.getName(), labelNo);
+            if(leaf.isDirectory()) {
+                labelNo++;
+                leaf.listFiles();
+                labelMap.put(leaf.getName(), labelNo);
+            }
 		}
 		return labelMap;
 	}

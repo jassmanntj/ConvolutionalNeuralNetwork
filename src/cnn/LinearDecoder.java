@@ -148,7 +148,7 @@ public class LinearDecoder extends NeuralNetworkLayer implements DiffFunction{
 		//delta2
 		DoubleMatrix delta2 = delta3.mmul(theta2.transpose());
 		delta2.addiRowVector(betaTerm);
-		delta2.muli(sigmoidGradient(result[0][1]));
+		delta2.muli(Utils.sigmoidGradient(result[0][1]));
 		//W2grad
 		thetaGrad[1] = result[0][1].transpose().mmul(delta3);
 		thetaGrad[1].divi(m);
@@ -264,7 +264,7 @@ public class LinearDecoder extends NeuralNetworkLayer implements DiffFunction{
 		bias = bias.mmul(bias1);
 		result[1][1].addi(bias);
 		//a2
-		result[0][1] = sigmoid(result[1][1]);
+		result[0][1] = Utils.sigmoid(result[1][1]);
 		//z3
 		bias = DoubleMatrix.ones(m, 1);
 		bias = bias.mmul(bias2);
@@ -393,13 +393,9 @@ public class LinearDecoder extends NeuralNetworkLayer implements DiffFunction{
 	public DoubleMatrix compute(DoubleMatrix input) {
 		DoubleMatrix result = input.mmul(theta1);
 		result.addiRowVector(bias1);
-		return sigmoid(result);
+		return Utils.sigmoid(result);
 	}
-	
-	private DoubleMatrix sigmoid(DoubleMatrix z) {
-		return MatrixFunctions.exp(z.neg()).add(1).rdiv(1);
-	}
-	
+
 	public void visualize(int size, int images, String filename) throws IOException {
 		BufferedImage image = new BufferedImage(size*images+images*2+2, size*images+images*2+2, BufferedImage.TYPE_INT_RGB);
 		DoubleMatrix tht1 = theta1.dup();
@@ -428,11 +424,6 @@ public class LinearDecoder extends NeuralNetworkLayer implements DiffFunction{
 		}
 		File imageFile = new File(filename);
 		ImageIO.write(image, "png", imageFile);
-	}
-	
-	private DoubleMatrix sigmoidGradient(DoubleMatrix a) {
-		DoubleMatrix result = a.dup();
-		return result.negi().addi(1).muli(a);
 	}
 
 	@Override

@@ -18,6 +18,9 @@ import edu.stanford.nlp.optimization.QNMinimizer;
 
 public class SparseAutoencoder extends NeuralNetworkLayer implements DiffFunction{
 	private static final boolean DEBUG = true;
+    private int layer1 = Utils.SIGMOID;
+    private int layer2 = Utils.NONE;
+
 	private int inputSize;
 	private int hiddenSize;
 	private int outputSize;
@@ -26,6 +29,8 @@ public class SparseAutoencoder extends NeuralNetworkLayer implements DiffFunctio
 	private double lambda;
 	private double beta;
 	private double alpha;
+    private double a1 = 0.25;
+    private double a2 = 0.25;
 	private DoubleMatrix theta1;
 	private DoubleMatrix theta2;
 	private DoubleMatrix bias1;
@@ -48,8 +53,8 @@ public class SparseAutoencoder extends NeuralNetworkLayer implements DiffFunctio
 	
 	private void initializeParams() {
 		double r = Math.sqrt(6)/Math.sqrt(hiddenSize+inputSize+1);
-		theta1 = DoubleMatrix.rand(inputSize, hiddenSize).muli(2*r).subi(r);
-		theta2 = DoubleMatrix.rand(hiddenSize, outputSize).muli(2*r).subi(r);
+		theta1 = DoubleMatrix.randn(inputSize, hiddenSize).muli(2*r).subi(r);
+		theta2 = DoubleMatrix.randn(hiddenSize, outputSize).muli(2*r).subi(r);
 		bias1 = DoubleMatrix.zeros(1, hiddenSize);
 		bias2 = DoubleMatrix.zeros(1, outputSize);
 	}
@@ -115,16 +120,16 @@ public class SparseAutoencoder extends NeuralNetworkLayer implements DiffFunctio
 	}
 	
 	protected CostResult[] cost(DoubleMatrix input, DoubleMatrix output, DoubleMatrix theta1, DoubleMatrix theta2, DoubleMatrix bias1, DoubleMatrix bias2) {
-		DoubleMatrix[][] result = feedForward(input, theta1, theta2, bias1, bias2);
+		DoubleMatrix[] result = feedForward(input, theta1, theta2, bias1, bias2);
 		DoubleMatrix[] thetaGrad = new DoubleMatrix[2];
 		thetaGrad[0] = DoubleMatrix.zeros(theta1.rows, theta1.columns);
 		thetaGrad[1] = DoubleMatrix.zeros(theta2.rows, theta2.columns);
 		// squared error
-		DoubleMatrix cost = result[0][2].sub(output);
+		DoubleMatrix cost = result[3].sub(output);
 		cost.muli(cost);
 		double squaredErr = cost.sum() / (2 * m);
 		//sparsity
-		DoubleMatrix means = result[0][1].columnMeans();
+		DoubleMatrix means = result[1].columnMeans();
 		double klsum = MatrixFunctions.log(means.rdiv(rho)).mul(rho).add(MatrixFunctions.log(means.rsub(1).rdiv(1-rho)).mul(1-rho)).sum();
 		double sparsity = klsum * beta;
 		//weightDecay
@@ -133,16 +138,16 @@ public class SparseAutoencoder extends NeuralNetworkLayer implements DiffFunctio
 		weightDecay *= lambda/2;
 		double costSum = squaredErr + weightDecay + sparsity;
 		//delta3
-		DoubleMatrix delta3 = result[0][2].sub(output);
-		delta3.muli(Utils.sigmoidGradient(result[0][2]));
+		DoubleMatrix delta3 = result[3].sub(output);
+		Utils.activationGradient(layer2, result[2], delta3);
 		//sparsity term
 		DoubleMatrix betaTerm = means.rdiv(-rho).add(means.rsub(1).rdiv(1-rho)).mul(beta);
 		//delta2
 		DoubleMatrix delta2 = delta3.mmul(theta2.transpose());
 		delta2.addiRowVector(betaTerm);
-		delta2.muli(Utils.sigmoidGradient(result[0][1]));
+		Utils.activationGradient(layer1, result[0], delta2);
 		//W2grad
-		thetaGrad[1] = result[0][1].transpose().mmul(delta3);
+		thetaGrad[1] = result[1].transpose().mmul(delta3);
 		thetaGrad[1].divi(m);
 		thetaGrad[1].addi(theta2.mul(lambda));
 		//W1grad
@@ -154,9 +159,25 @@ public class SparseAutoencoder extends NeuralNetworkLayer implements DiffFunctio
 		biasGrad[1] = delta3.columnMeans();
 		//b1grad
 		biasGrad[0] = delta2.columnMeans();
+
+        double a2grad = 0;//result[2].le(0).mul(result[2]).sum();
+        double a1grad = 0;//result[0].le(0).mul(result[0]).sum() * a2grad;
+        for(int i = 0; i < result[2].rows; i++) {
+            for(int j = 0; j < result[2].columns; j++) {
+                if(result[2].get(i,j) < 0) a2grad += result[2].get(i,j);
+            }
+        }
+        for(int i = 0; i < result[0].rows; i++) {
+            for(int j = 0; j < result[0].columns; j++) {
+                if(result[0].get(i,j) < 0) a1grad += result[0].get(i,j);
+            }
+        }
+        a1grad *= a2grad;
+
+
 		CostResult[] results = new CostResult[2];
-		results[0] = new CostResult(0, thetaGrad[0], biasGrad[0], delta2);
-		results[1] = new CostResult(costSum, thetaGrad[1], biasGrad[1], delta3);
+		results[0] = new CostResult(0, thetaGrad[0], biasGrad[0], delta2, a1grad);
+		results[1] = new CostResult(costSum, thetaGrad[1], biasGrad[1], delta3, a2grad);
 		return results;
 	}
 	
@@ -169,7 +190,7 @@ public class SparseAutoencoder extends NeuralNetworkLayer implements DiffFunctio
 		//delta2
 		DoubleMatrix delta2 = delta3.mmul(theta1.transpose());
 
-		delta2.muli(Utils.sigmoidGradient(input));
+		Utils.activationGradient(layer1, input, delta2);
 		
 		//W1grad
 		DoubleMatrix thetaGrad = input.transpose().mmul(delta3);
@@ -189,16 +210,20 @@ public class SparseAutoencoder extends NeuralNetworkLayer implements DiffFunctio
 		System.out.println("Starting lbfgs.");
 		System.out.println("-----");
 		QNMinimizer qn = new QNMinimizer(15, true);
-		double[] initial = new double[theta1.length+theta2.length+bias1.length+bias2.length];
+		double[] initial = new double[theta1.length+theta2.length+bias1.length+bias2.length+2];
 		System.arraycopy(theta1.data, 0, initial, 0, theta1.data.length);
 		System.arraycopy(theta2.data, 0, initial, theta1.data.length, theta2.data.length);
 		System.arraycopy(bias1.data, 0, initial, theta1.data.length+theta2.data.length, bias1.data.length);
 		System.arraycopy(bias2.data, 0, initial, theta1.data.length+theta2.data.length+bias1.data.length, bias2.data.length);
+        initial[initial.length-1] = a2;
+        initial[initial.length-2] = a1;
 		initial = qn.minimize(this, 1e-5, initial, iterations);
 		System.arraycopy(initial, 0, theta1.data, 0, theta1.data.length);
 		System.arraycopy(initial, theta1.data.length, theta2.data, 0, theta2.data.length);
 		System.arraycopy(initial, theta1.data.length+theta2.data.length, bias1.data, 0, bias1.data.length);
 		System.arraycopy(initial, theta1.data.length+theta2.data.length+bias1.data.length, bias2.data, 0, bias2.data.length);
+        a2 = initial[initial.length-1];
+        a1 = initial[initial.length-2];
 	}
 	
 	
@@ -248,23 +273,21 @@ public class SparseAutoencoder extends NeuralNetworkLayer implements DiffFunctio
 		}
 	}
 	
-	private DoubleMatrix[][] feedForward(DoubleMatrix patches, DoubleMatrix theta1, DoubleMatrix theta2, DoubleMatrix bias1, DoubleMatrix bias2) {
-		DoubleMatrix[][] result = new DoubleMatrix[2][4];
-		result[0][0] = patches;
+	private DoubleMatrix[] feedForward(DoubleMatrix patches, DoubleMatrix theta1, DoubleMatrix theta2, DoubleMatrix bias1, DoubleMatrix bias2) {
+		DoubleMatrix[] result = new DoubleMatrix[4];
 		//z2
-		result[1][1] = result[0][0].mmul(theta1);
+		result[0] = patches.mmul(theta1);
 		DoubleMatrix bias = DoubleMatrix.ones(m,1);
 		bias = bias.mmul(bias1);
-		result[1][1].addi(bias);
+		result[0].addi(bias);
 		//a2
-		result[0][1] = Utils.sigmoid(result[1][1]);
+		result[1] = Utils.activationFunction(layer1, result[0]);
 		//z3
 		bias = DoubleMatrix.ones(m, 1);
 		bias = bias.mmul(bias2);
-		result[1][2] = result[0][1].mmul(theta2);
-		result[1][2].addi(bias);
-		//a3
-		result[0][2] = Utils.sigmoid(result[1][2]);
+		result[2] = result[1].mmul(theta2);
+		result[2].addi(bias);
+        result[3] = Utils.activationFunction(layer2, result[2]);
 		return result;
 	}
 	
@@ -317,7 +340,7 @@ public class SparseAutoencoder extends NeuralNetworkLayer implements DiffFunctio
 		DoubleMatrix bias = DoubleMatrix.ones(input.rows, 1);
 		bias = bias.mmul(bias1);
 		result.addi(bias);
-		return Utils.sigmoid(result);
+		return Utils.activationFunction(layer1, result);
 	}
 	
 	public void visualize(int size) throws IOException {
@@ -357,13 +380,17 @@ public class SparseAutoencoder extends NeuralNetworkLayer implements DiffFunctio
 		System.arraycopy(dTheta, theta1.data.length, theta2.data, 0, theta2.data.length);
 		System.arraycopy(dTheta, theta1.data.length+theta2.data.length, bias1.data, 0, bias1.data.length);
 		System.arraycopy(dTheta, theta1.data.length+theta2.data.length+bias1.data.length, bias2.data, 0, bias2.data.length);
+        a2 = dTheta[dTheta.length-1];
+        a1 = dTheta[dTheta.length-2];
 		currentCost = cost(input, output, theta1, theta2, bias1, bias2);
-		double[] derivative = new double[theta1.length+theta2.length+bias1.length+bias2.length];
+		double[] derivative = new double[theta1.length+theta2.length+bias1.length+bias2.length+2];
 		System.arraycopy(currentCost[0].thetaGrad.data, 0, derivative, 0, theta1.data.length);
 		System.arraycopy(currentCost[1].thetaGrad.data, 0, derivative, theta1.data.length, theta2.data.length);
 		System.arraycopy(currentCost[0].biasGrad.data, 0, derivative, theta1.data.length+theta2.data.length, bias1.data.length);
 		System.arraycopy(currentCost[1].biasGrad.data, 0, derivative, theta1.data.length+theta2.data.length+bias1.data.length, bias2.data.length);
-		return derivative;
+		derivative[derivative.length-1] = currentCost[1].getAGrad();
+        derivative[derivative.length-2] = currentCost[0].getAGrad();
+        return derivative;
 	}
 
 	@Override
@@ -388,6 +415,8 @@ public class SparseAutoencoder extends NeuralNetworkLayer implements DiffFunctio
 					writer.write(bias1.get(i,j)+",");
 				}
 			}
+            writer.write("\n"+a1);
+            writer.write("\n"+a2);
 			writer.close();
 		}
 		catch(IOException e) {
@@ -414,6 +443,8 @@ public class SparseAutoencoder extends NeuralNetworkLayer implements DiffFunctio
 					bias1.put(i, j, Double.parseDouble(data[i * bias1.columns + j]));
 				}
 			}
+            a1 = Double.parseDouble(reader.readLine());
+            a2 = Double.parseDouble(reader.readLine());
 			reader.close();
 		}
 		catch(IOException e) {

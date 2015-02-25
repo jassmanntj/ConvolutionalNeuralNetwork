@@ -7,6 +7,7 @@ public class CostResult {
 	public DoubleMatrix delta;
 	public DoubleMatrix thetaGrad;
 	public DoubleMatrix biasGrad;
+    public double aGrad;
 	
 	public CostResult(double cost, DoubleMatrix thetaGrad, DoubleMatrix biasGrad, DoubleMatrix delta) {
 		this.cost = cost;
@@ -14,7 +15,19 @@ public class CostResult {
 		this.biasGrad = biasGrad;
 		this.delta = delta;
 	}
-	
+
+    public CostResult(double cost, DoubleMatrix thetaGrad, DoubleMatrix biasGrad, DoubleMatrix delta, double aGrad) {
+        this.cost = cost;
+        this.thetaGrad = thetaGrad;
+        this.biasGrad = biasGrad;
+        this.delta = delta;
+        this.aGrad = aGrad;
+    }
+
+    public double getAGrad() {
+        return aGrad;
+    }
+
 	public static double[] getGrads(CostResult[] res) {
 		int numElements = 0;
 		for(int i = 0; i < res.length; i++) {

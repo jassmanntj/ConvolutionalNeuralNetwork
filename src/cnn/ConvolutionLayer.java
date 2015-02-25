@@ -24,6 +24,7 @@ public class ConvolutionLayer extends NeuralNetworkLayer {
 	private DoubleMatrix whitenedTheta;
 	private DoubleMatrix whitenedBias;
 	private DoubleMatrix pooledFeatures;
+    private DoubleMatrix convolvedFeatures;
 	private int patchSize;
 	private int imageSize;
 	private int resultRows;
@@ -88,6 +89,7 @@ public class ConvolutionLayer extends NeuralNetworkLayer {
 		this.resultCols = (imageCols-patchDim+1)/poolDim;
 		this.imageSize = imageRows*imageCols;
 		this.pooledFeatures = new DoubleMatrix(images.rows, numFeatures * (resultRows * resultCols));
+        this.convolvedFeatures = new DoubleMatrix(images.rows, numFeatures * imageRows * imageCols);
 		ExecutorService executor = Executors.newFixedThreadPool(Utils.NUMTHREADS);
 		for(int imageNum = 0; imageNum < images.rows; imageNum++) {
 			Runnable worker = new ConvolutionThread(imageNum);
@@ -96,6 +98,7 @@ public class ConvolutionLayer extends NeuralNetworkLayer {
 		executor.shutdown();
 		while(!executor.isTerminated());
 		return pooledFeatures;
+        //return convolvedFeatures;
 	}
 	
 	private class ConvolutionThread implements Runnable {
@@ -109,6 +112,7 @@ public class ConvolutionLayer extends NeuralNetworkLayer {
 		public void run() {
 			System.out.println("Image: " + imageNum);
 			DoubleMatrix currentImage = images.getRow(imageNum);
+            DoubleMatrix convolvedImage = new DoubleMatrix(1,0);
 			for (int featureNum = 0; featureNum < whitenedTheta.columns; featureNum++) {
 				DoubleMatrix convolvedFeature = null;
 				try {
@@ -116,8 +120,11 @@ public class ConvolutionLayer extends NeuralNetworkLayer {
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
+                convolvedImage = DoubleMatrix.concatHorizontally(convolvedImage, convolvedFeature);
+                //convolvedFeatures.putRow(imageNum, convolvedFeature);
 				pool(convolvedFeature, imageNum, featureNum);
 			}
+            convolvedFeatures.putRow(imageNum, convolvedImage);
 		}
 
 	}
@@ -252,24 +259,30 @@ public class ConvolutionLayer extends NeuralNetworkLayer {
 
 	@Override
 	public DoubleMatrix train(DoubleMatrix input, DoubleMatrix output, int iterations) {
-		LinearDecoder ae = new LinearDecoder(patchDim, channels, numPatches, sparsityParam, lambda, beta, alpha);
+        int inputSize = patchDim*patchDim*channels;
+		//SparseAutoencoder ae = new SparseAutoencoder(inputSize, numPatches, inputSize, sparsityParam, lambda, beta, alpha);
+        LinearDecoder ae = new LinearDecoder(patchDim, channels, numPatches, sparsityParam, lambda, beta, alpha);
 		DoubleMatrix patches = ImageLoader.sample(patchDim, 100000, input, imageCols, imageRows, channels);
-		if(whiten) {
-			patches.divi(patches.max());
-			DoubleMatrix meanPatch = patches.columnMeans();
-			DoubleMatrix ZCAWhite = Utils.calculateZCAWhite(patches, meanPatch, 0.1);
-			patches = Utils.ZCAWhiten(patches, meanPatch, ZCAWhite);
-			ae.train(patches, patches, iterations);
-			DoubleMatrix previousTheta = ae.getTheta();
-			DoubleMatrix previousBias = ae.getBias();
-			whitenedTheta = ZCAWhite.mmul(previousTheta);
-			whitenedBias = previousBias.sub(meanPatch.mmul(whitenedTheta));
-		}
-		else {
-			ae.train(patches, patches, iterations);
-			this.whitenedTheta = ae.getTheta();
-			this.whitenedBias = ae.getBias();
-		}
+        //try {
+            if(whiten) {
+                patches.divi(patches.max());
+                DoubleMatrix meanPatch = patches.columnMeans();
+                DoubleMatrix ZCAWhite = Utils.calculateZCAWhite(patches, meanPatch, 0.1);
+                patches = Utils.ZCAWhiten(patches, meanPatch, ZCAWhite);
+                ae.train(patches, patches, iterations);
+                DoubleMatrix previousTheta = ae.getTheta();
+                DoubleMatrix previousBias = ae.getBias();
+                whitenedTheta = ZCAWhite.mmul(previousTheta);
+                whitenedBias = previousBias.sub(meanPatch.mmul(whitenedTheta));
+            }
+            else {
+                ae.train(patches, patches, iterations);
+                this.whitenedTheta = ae.getTheta();
+                this.whitenedBias = ae.getBias();
+            }
+        /*} catch (IOException e) {
+            e.printStackTrace();
+        }*/
 		return compute(input);
 		
 	}

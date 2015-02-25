@@ -87,7 +87,7 @@ public class DeepNN extends NeuralNetworkLayer implements DiffFunction {
 		for(int i = 0; i < saes.length; i++) {
 			results[i+1] = saes[i].compute(results[i]);
 		}
-		CostResult softMaxCost = sc.stackedCost(results[saes.length], output);
+		CostResult softMaxCost = sc.cost(results[saes.length], output);
 		costResults[saes.length] = softMaxCost; 
 		DoubleMatrix lastDelta = softMaxCost.delta;
 		DoubleMatrix lastTheta = sc.getTheta();

@@ -76,12 +76,12 @@ public class LeafCNN {
         int imageColumns2 = (imageColumns-patchSize+1)/poolSize;
         int channels2 = numPatches;
 
-        String resFile = "Final"+patchSize+"."+numPatches+"."+poolSize+"."+patchSize2+"."+numPatches2+"."+poolSize2+".";
+        String resFile = "Final"+patchSize+"."+numPatches+"."+poolSize+"."+patchSize2+"."+numPatches2+"."+poolSize2+".z";
 		
 		ImageLoader loader = new ImageLoader();
-		File folder = new File("C:/Users/jassmanntj/Desktop/TrainRot5.0");
-		HashMap<String, Double> labelMap = loader.getLabelMap(folder);
-		
+		File folder = new File("C:/Users/jassmanntj/Desktop/TrainSort");
+        HashMap<String, Double> labelMap = loader.getLabelMap(folder);
+
 		if(!load) {
 			loader.loadFolder(folder, channels, imageColumns, imageRows, labelMap);
 			images = loader.getImages();
@@ -100,6 +100,7 @@ public class LeafCNN {
 			images = new DoubleMatrix("data/Train.mat");
 		}
 
+
 		ConvolutionLayer cl = new ConvolutionLayer(channels, patchSize, imageRows, imageColumns, poolSize, numPatches, sparsityParam, lambda, beta, alpha, true);
 		//ConvolutionLayer cl2 = new ConvolutionLayer(channels2, patchSize2, imageRows2, imageColumns2, poolSize2, numPatches2, sparsityParam, lambda, beta, alpha, true);
 		//SparseAutoencoder ae2 = new SparseAutoencoder(cl.getOutputSize(), hiddenSize, cl.getOutputSize(), sparsityParam, lambda, beta, alpha);
@@ -112,9 +113,10 @@ public class LeafCNN {
 		DoubleMatrix result = cnn.train(images, labels, 3200);
 		int[][] results = Utils.computeResults(result);
         System.out.println("RESULT: "+result.rows+"X"+result.columns);
+        System.out.println("LABELS: "+labels.rows+"X"+labels.columns);
 		System.out.println("TRAIN");
         compareResults(results, labels);
-		/*
+
 
 		folder = new File("C:/Users/jassmanntj/Desktop/TestSort");
 		if(!load) {
@@ -148,16 +150,14 @@ public class LeafCNN {
 		writeResults(testRes, testLabels, fileNames, resFile);
 		System.out.println("PHOTOTEST");
 		compareResults(photoTestResult, photoTestLabels);
-		writeResults(photoTestRes, photoTestLabels, photoFiles, "Photo"+resFile);*/
+		writeResults(photoTestRes, photoTestLabels, photoFiles, "Photo"+resFile);
 	}
 	
 	public void compareResults(int[][] result, DoubleMatrix labels) {
 		double sum1 = 0;
 		double sum2 = 0;
 		double sum3 = 0;
-        System.out.println(labels.rows+":"+labels.columns);
 		for(int i = 0; i < result.length; i++) {
-            System.out.println(result[i][0]+":"+result[i][1]+":"+result[i][2]);
 			sum1 += labels.get(i, result[i][0]);
 			sum2 += labels.get(i, result[i][1]);
 			sum3 += labels.get(i, result[i][2]);

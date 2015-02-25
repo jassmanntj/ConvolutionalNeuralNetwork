@@ -53,37 +53,23 @@ public class SoftmaxClassifier extends NeuralNetworkLayer implements DiffFunctio
 	}
 	
 	public CostResult cost(DoubleMatrix input, DoubleMatrix output, DoubleMatrix theta) {
-		DoubleMatrix res1 = input.mmul(theta);
-		DoubleMatrix maxes = res1.rowMaxs();
-		DoubleMatrix res = res1.subColumnVector(maxes);
-		MatrixFunctions.expi(res);
-		res.diviColumnVector(res.rowSums());
-		DoubleMatrix thetaGrad = res.sub(output);
-		thetaGrad = input.transpose().mmul(thetaGrad);
-		thetaGrad.divi(m);
-		thetaGrad.addi(theta.mul(lambda));
-		MatrixFunctions.logi(res);
-		
-		double cost = -res.mul(output).sum()/m + theta.mul(theta).sum() * lambda / 2;
-		return new CostResult(cost, thetaGrad, null, null);
-	}
-	
-	public CostResult cost(DoubleMatrix input, DoubleMatrix output) {
-		return cost(input,output,theta);
-	}
-	
-	public CostResult stackedCost(DoubleMatrix input, DoubleMatrix output) {
 		m = input.rows;
 		DoubleMatrix res = input.mmul(theta);
 		DoubleMatrix p = res.subColumnVector(res.rowMaxs());
 		MatrixFunctions.expi(p);
 		p.diviColumnVector(p.rowSums());
+
 		DoubleMatrix thetaGrad =input.transpose().mmul(p.sub(output)).div(m).add(theta.mul(lambda));
-		DoubleMatrix delta = p.sub(output).mmul(theta.transpose()).mul(Utils.sigmoidGradient(input));
+		DoubleMatrix delta = p.sub(output).mmul(theta.transpose());
+        Utils.activationGradient(Utils.SIGMOID, input, delta);
 		MatrixFunctions.logi(p);
 		double cost = -p.mul(output).sum()/m + theta.mul(theta).sum()*lambda/2;
 		return new CostResult(cost, thetaGrad, null, delta);
 	}
+
+    public CostResult cost(DoubleMatrix input, DoubleMatrix output) {
+        return cost(input, output, theta);
+    }
 
 	public void gradientDescent(DoubleMatrix input, DoubleMatrix output, int iterations, double alpha) {
 		m = input.rows;
@@ -232,14 +218,14 @@ public class SoftmaxClassifier extends NeuralNetworkLayer implements DiffFunctio
 	@Override
 	public double valueAt(double[] arg0) {
 		theta.data = arg0;
-		CostResult res = cost(input, output);
+		CostResult res = cost(input, output, theta);
 		return res.cost;
 	}
 
 	@Override
 	public double[] derivativeAt(double[] arg0) {
 		theta.data = arg0;
-		CostResult res = cost(input, output);
+		CostResult res = cost(input, output, theta);
 		return res.thetaGrad.data;
 	}
 

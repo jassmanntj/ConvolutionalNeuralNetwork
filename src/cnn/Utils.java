@@ -14,6 +14,10 @@ import org.jtransforms.fft.DoubleFFT_2D;
 
 public class Utils {
     public static final int NUMTHREADS = 8;
+    public static final int NONE = 0;
+    public static final int SIGMOID = 1;
+    public static final int PRELU = 2;
+    public static final int RELU = 3;
 	public static DoubleMatrix calculateZCAWhite(DoubleMatrix input, DoubleMatrix meanPatch, double epsilon) {
         DoubleMatrix sigma = input.subRowVector(meanPatch);
         sigma = sigma.transpose().mmul(sigma);
@@ -123,6 +127,75 @@ public class Utils {
 		File imageFile = new File(filename);
 		ImageIO.write(image, "png", imageFile);
 	}
+
+    public static DoubleMatrix activationFunction(int type, DoubleMatrix z, double a) {
+        switch(type) {
+            case SIGMOID:
+                return sigmoid(z);
+            case PRELU:
+                return prelu(z, a);
+            case RELU:
+                return relu(z);
+            case NONE:
+                return z;
+            default:
+                return sigmoid(z);
+        }
+    }
+
+    public static DoubleMatrix activationGradient(int type, DoubleMatrix z, double a, DoubleMatrix delta) {
+        switch(type) {
+            case SIGMOID:
+                return delta.muli(sigmoidGradient(sigmoid(z)));
+            case PRELU:
+                return delta.muli(preluGradient(z, a));
+            case RELU:
+                return delta.muli(reluGradient(z));
+            case NONE:
+                return delta;
+            default:
+                return delta.muli(sigmoidGradient(sigmoid(z)));
+        }
+    }
+
+    public static DoubleMatrix activationFunction(int type, DoubleMatrix z) {
+        return activationFunction(type, z, 0.25);
+    }
+
+    public static DoubleMatrix activationGradient(int type, DoubleMatrix z, DoubleMatrix delta) {
+        return activationGradient(type, z, 0.25, delta);
+    }
+
+    public static DoubleMatrix prelu(DoubleMatrix z, double a) {
+        DoubleMatrix res = z.dup();
+        for(int i = 0; i < res.rows; i++) {
+            for(int j = 0; j < res.columns; j++) {
+                double k = res.get(i,j);
+                if(k < 0) res.put(i,j, a*k);
+            }
+        }
+        return res;
+    }
+
+    public static DoubleMatrix relu(DoubleMatrix z) {
+        return prelu(z, 0);
+    }
+
+    public static DoubleMatrix preluGradient(DoubleMatrix z, double a) {
+        DoubleMatrix res = new DoubleMatrix(z.rows, z.columns);
+        for(int i = 0; i < z.columns; i++) {
+            for(int j = 0; j < z.columns; j++) {
+                double k = z.get(i,j);
+                if(k > 0) res.put(i,j,1);
+                else res.put(i,j,a);
+            }
+        }
+        return res;
+    }
+
+    public static DoubleMatrix reluGradient(DoubleMatrix z) {
+        return z.gt(0);
+    }
 	
 	public static DoubleMatrix sigmoid(DoubleMatrix z) {
 		return MatrixFunctions.exp(z.neg()).add(1).rdiv(1);
