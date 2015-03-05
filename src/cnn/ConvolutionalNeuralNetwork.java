@@ -36,6 +36,22 @@ public class ConvolutionalNeuralNetwork {
 		}
 		return input;
 	}
+
+    public void fineTune(DoubleMatrix input, DoubleMatrix labels, int iterations, double alpha) throws IOException {
+        DoubleMatrix[] results = new DoubleMatrix[layers.length-1];
+        for(int i = 0; i < iterations; i++) {
+            DoubleMatrix y = labels;
+            int j = 0;
+            for(; j < layers.length-1; j++) {
+                results[j] = layers[j].feedForward(input);
+            }
+            j++;
+            for(; j >=0; j--) {
+                //alpha *= 0.96;
+                y = layers[j].backPropagation(results, j, y, ((double)i)/iterations, alpha);
+            }
+        }
+    }
 	
 	public int[][] compute(DoubleMatrix input) {
 		for(int i = startLayer; i < layers.length; i++) {

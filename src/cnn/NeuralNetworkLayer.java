@@ -13,4 +13,10 @@ public abstract class NeuralNetworkLayer {
 	public abstract DoubleMatrix train(DoubleMatrix input, DoubleMatrix output, int iterations) throws IOException;
 	public abstract void writeLayer(String filename);
 	public abstract void loadLayer(String filename);
+    public abstract DoubleMatrix feedForward(DoubleMatrix input);
+    public abstract DoubleMatrix backPropagation(DoubleMatrix[] results, int layer, DoubleMatrix y, double momentum, double alpha);
+    public abstract DoubleMatrix getA();
+    public double getCost() {
+        return 0;
+    }
 }

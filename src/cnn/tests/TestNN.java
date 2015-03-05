@@ -26,7 +26,7 @@ public class TestNN {
 		double alpha = 0.3;
 		SparseAutoencoder sae = new SparseAutoencoder(unlabeledData.columns, hiddenSize, unlabeledData.columns, sparsityParam, lambda, beta, alpha);
 		lambda = 1e-4;
-		SoftmaxClassifier sc = new SoftmaxClassifier(lambda);	
+		SoftmaxClassifier sc = new SoftmaxClassifier(lambda, alpha);
 		NeuralNetwork nn = new NeuralNetwork(sae, sc);
 		nn.train(input, labels, unlabeledData, 200);
 		int[] result = nn.compute(input);

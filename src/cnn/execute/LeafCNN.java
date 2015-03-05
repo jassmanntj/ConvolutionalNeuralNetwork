@@ -29,16 +29,8 @@ import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
 
+import cnn.*;
 import org.jblas.DoubleMatrix;
-
-import cnn.ConvolutionLayer;
-import cnn.ConvolutionalNeuralNetwork;
-import cnn.DeepNN;
-import cnn.ImageLoader;
-import cnn.NeuralNetworkLayer;
-import cnn.SoftmaxClassifier;
-import cnn.SparseAutoencoder;
-import cnn.Utils;
 
 public class LeafCNN {
 	private static final boolean load = false;
@@ -56,17 +48,18 @@ public class LeafCNN {
 	}
 
 	public void run() throws Exception {
-		int patchSize = 11;
-		int poolSize = 10;
-		int numPatches = 256;
-		//int hiddenSize = 200;
+		int patchSize = 9;
+		int poolSize = 4;
+		int numPatches = 200;
+		int hiddenSize = 250;
 		int imageRows = 80;
 		int imageColumns = 60;
 		double sparsityParam = 0.035;
-		double lambda = 3e-3;
+		double lambda = 5e-4; //3e-3
 		double beta = 5;
-		double alpha = 0.5;
+		double alpha = 1e-2;
 		int channels = 3;
+        int iterations = 100;
 
         //CL2
         int patchSize2 = 2;
@@ -76,22 +69,23 @@ public class LeafCNN {
         int imageColumns2 = (imageColumns-patchSize+1)/poolSize;
         int channels2 = numPatches;
 
-        String resFile = "Final"+patchSize+"."+numPatches+"."+poolSize+"."+patchSize2+"."+numPatches2+"."+poolSize2+".z";
+        String resFile = "Final"+patchSize+"."+numPatches+"."+poolSize+"."+patchSize2+"."+numPatches2+"."+poolSize2+".10";
 		
 		ImageLoader loader = new ImageLoader();
-		File folder = new File("C:/Users/jassmanntj/Desktop/TrainSort");
+		File folder = new File("C:/Users/jassmanntj/Desktop/TrainImages");
         HashMap<String, Double> labelMap = loader.getLabelMap(folder);
 
 		if(!load) {
 			loader.loadFolder(folder, channels, imageColumns, imageRows, labelMap);
+            //loader.randomizeImages(1000);
 			images = loader.getImages();
 			photoTrain = loader.getPhotoImages();
 			labels = loader.getLabels();
 			photoLabels = loader.getPhotoLabels();
-			labels.save("data/TrainLabels.mat");
-			photoLabels.save("data/PhotoTrainLabels.mat");
-			photoTrain.save("data/PhotoTrain.mat");
-			images.save("data/Train.mat");
+			//labels.save("data/TrainLabels.mat");
+			//photoLabels.save("data/PhotoTrainLabels.mat");
+			//photoTrain.save("data/PhotoTrain.mat");
+			//images.save("data/Train.mat");
 		}
 		else {
 			labels = new DoubleMatrix("data/TrainLabels.mat");
@@ -103,20 +97,19 @@ public class LeafCNN {
 
 		ConvolutionLayer cl = new ConvolutionLayer(channels, patchSize, imageRows, imageColumns, poolSize, numPatches, sparsityParam, lambda, beta, alpha, true);
 		//ConvolutionLayer cl2 = new ConvolutionLayer(channels2, patchSize2, imageRows2, imageColumns2, poolSize2, numPatches2, sparsityParam, lambda, beta, alpha, true);
-		//SparseAutoencoder ae2 = new SparseAutoencoder(cl.getOutputSize(), hiddenSize, cl.getOutputSize(), sparsityParam, lambda, beta, alpha);
-		SoftmaxClassifier sc = new SoftmaxClassifier(1e-4);
-		//SparseAutoencoder[] saes = {ae2};
-		//DeepNN dn = new DeepNN(saes, sc);
-		NeuralNetworkLayer[] nnl = {cl, sc};
+		LinearDecoder ae2 = new LinearDecoder(cl.getOutputRows(), cl.getOutputColumns(), numPatches, hiddenSize, sparsityParam, lambda, beta, alpha/50000, Utils.PRELU, Utils.NONE);
+        SoftmaxClassifier sc = new SoftmaxClassifier(1e-4, alpha);
+		LinearDecoder[] saes = {ae2};
+		DeepNN dn = new DeepNN(saes, sc);
+		NeuralNetworkLayer[] nnl = {cl, dn};
 		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(nnl, resFile);
 		
-		DoubleMatrix result = cnn.train(images, labels, 3200);
+		DoubleMatrix result = cnn.train(images, labels, iterations);
 		int[][] results = Utils.computeResults(result);
         System.out.println("RESULT: "+result.rows+"X"+result.columns);
         System.out.println("LABELS: "+labels.rows+"X"+labels.columns);
 		System.out.println("TRAIN");
         compareResults(results, labels);
-
 
 		folder = new File("C:/Users/jassmanntj/Desktop/TestSort");
 		if(!load) {
@@ -125,10 +118,10 @@ public class LeafCNN {
 			testLabels = loader.getLabels();
 			photoTest = loader.getPhotoImages();
 			photoTestLabels = loader.getPhotoLabels();
-			photoTest.save("data/PhotoTest.mat");
-			photoTestLabels.save("data/PhotoTestLabels.mat");
-			testImages.save("data/Test.mat");
-			testLabels.save("data/TestLabels.mat");
+			//photoTest.save("data/PhotoTest.mat");
+			//photoTestLabels.save("data/PhotoTestLabels.mat");
+			//testImages.save("data/Test.mat");
+			//testLabels.save("data/TestLabels.mat");
 		}
 		else {
 			photoTest = new DoubleMatrix("data/PhotoTest.mat");

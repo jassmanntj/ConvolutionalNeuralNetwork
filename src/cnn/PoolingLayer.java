@@ -12,21 +12,41 @@ import java.util.concurrent.Executors;
 public class PoolingLayer extends NeuralNetworkLayer {
     private int poolDimX;
     private int poolDimY;
+    private int stepX;
+    private int stepY;
     private int resultRows;
     private int resultCols;
     private int features;
+
+    public DoubleMatrix getA() {
+        return null;
+    }
 
 
     public PoolingLayer(int poolDim, int features) {
         this.poolDimX = poolDim;
         this.poolDimY = poolDim;
+        this.stepX = poolDim;
+        this.stepY = poolDim;
         this.features = features;
     }
 
     public PoolingLayer(int poolDimX, int poolDimY, int features) {
         this.poolDimX = poolDimX;
         this.poolDimY = poolDimY;
+        this.stepX = poolDimX;
+        this.stepY = poolDimY;
         this.features = features;
+    }
+
+    public DoubleMatrix feedForward(DoubleMatrix input) {
+        return compute(input);
+    }
+
+    @Override
+    public DoubleMatrix backPropagation(DoubleMatrix[] results, int layer, DoubleMatrix y, double momentum, double alpha) {
+        DoubleMatrix delta = expand(y);
+        return delta;
     }
 
     public DoubleMatrix compute(DoubleMatrix input) {
@@ -69,6 +89,22 @@ public class PoolingLayer extends NeuralNetworkLayer {
                 pooledFeatures.put(imageNum, featureNum*resultRows*resultCols+poolRow*resultCols+poolCol, patch.mean());
             }
         }
+    }
+
+    private DoubleMatrix expand(DoubleMatrix in) {
+        DoubleMatrix expandedMatrix = new DoubleMatrix(in.rows*stepX, in.columns*stepY);
+        double scale = (poolDimX * poolDimX * poolDimY * poolDimY / (stepX * stepY));
+        for(int i = 0; i < in.rows; i++) {
+            for(int j = 0; j < in.columns; j++) {
+                double value = in.get(i,j)/scale;
+                for(int k = 0; k < poolDimY; k++) {
+                    for(int l = 0; l < poolDimX; l++) {
+                        expandedMatrix.put(i*stepY+k, j*stepX+l, expandedMatrix.get(i*stepY+k, j*stepX+l)+value);
+                    }
+                }
+            }
+        }
+        return expandedMatrix;
     }
 
     public DoubleMatrix getTheta() {

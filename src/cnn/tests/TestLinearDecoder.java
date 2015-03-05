@@ -12,7 +12,7 @@ public class TestLinearDecoder {
 
 	@Test
 	public void test() throws IOException, ExceptionWithIflag {
-		SAEImageHandler handler = new SAEImageHandler("patches.csv", 8*8*3, 100000);
+		/*SAEImageHandler handler = new SAEImageHandler("patches.csv", 8*8*3, 100000);
 		DoubleMatrix input = handler.getImages();
 		//scale data
 		input.divi(input.max());
@@ -23,6 +23,6 @@ public class TestLinearDecoder {
 		//ae.gradientDescent(input, input, 400);
 		ae.lbfgsTrain(input, 400);
 		System.out.println(input.rows+":"+input.columns);
-		ae.visualize(8,20, "Features.png");
+		ae.visualize(8,20, "Features.png");*/
 	}
 }

@@ -5,6 +5,8 @@ import java.io.BufferedWriter;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.jblas.DoubleMatrix;
 import org.jblas.MatrixFunctions;
@@ -17,13 +19,21 @@ public class SoftmaxClassifier extends NeuralNetworkLayer implements DiffFunctio
 	private int inputSize;
 	private int outputSize;
 	private int m;
+    private int T = 1;
 	private double lambda;
+    private double alpha;
+    private double cost;
 	private DoubleMatrix theta;
 	private DoubleMatrix input;
 	private DoubleMatrix output;
+    DoubleMatrix t1Velocity;
+    private int activation = Utils.SIGMOID;
 	
-	public SoftmaxClassifier(double lambda) {
+	public SoftmaxClassifier(double lambda, double alpha) {
 		this.lambda = lambda;
+        this.alpha = alpha;
+        this.cost = 0;
+        initializeParams();
 	}
 	
 	public DoubleMatrix getTheta() {
@@ -33,6 +43,7 @@ public class SoftmaxClassifier extends NeuralNetworkLayer implements DiffFunctio
 	private void initializeParams() {
 		double r = Math.sqrt(6)/Math.sqrt(inputSize+1);
 		theta = DoubleMatrix.rand(inputSize, outputSize).muli(2 * r).subi(r);
+        this.t1Velocity = new DoubleMatrix(theta.rows, theta.columns);
 	}
 	
 	public DoubleMatrix computeNumericalGradient(DoubleMatrix input, DoubleMatrix output) {
@@ -61,14 +72,76 @@ public class SoftmaxClassifier extends NeuralNetworkLayer implements DiffFunctio
 
 		DoubleMatrix thetaGrad =input.transpose().mmul(p.sub(output)).div(m).add(theta.mul(lambda));
 		DoubleMatrix delta = p.sub(output).mmul(theta.transpose());
-        Utils.activationGradient(Utils.SIGMOID, input, delta);
+        Utils.activationGradient(activation, input, delta);
 		MatrixFunctions.logi(p);
-		double cost = -p.mul(output).sum()/m + theta.mul(theta).sum()*lambda/2;
+		cost = -p.mul(output).sum()/m + theta.mul(theta).sum()*lambda/2;
 		return new CostResult(cost, thetaGrad, null, delta);
 	}
 
+    public double getCost() {
+        return cost;
+    }
+
+    public DoubleMatrix backPropagation(DoubleMatrix[] results, int layer, DoubleMatrix y, double momentum, double alpha) {
+        CostResult res = cost(results[layer-1], y, theta);
+        t1Velocity.muli(momentum).addi(res.thetaGrad.mul(alpha));
+        theta.subi(t1Velocity);
+        return res.delta;
+    }
+
+    public DoubleMatrix feedForward(DoubleMatrix input) {
+        return input.mmul(theta);
+    }
+
     public CostResult cost(DoubleMatrix input, DoubleMatrix output) {
         return cost(input, output, theta);
+    }
+
+    public void miniBatchGradientDescent(DoubleMatrix input, DoubleMatrix output, int iterations, final double momentum, int batchSize) {
+        m = input.rows;
+        System.out.println("INPUT Rows: "+input.rows+" Cols: "+input.columns);
+        System.out.println("Starting gradient descent with " + iterations + " iterations.");
+        System.out.println("-----");
+        final DoubleMatrix t1Velocity = new DoubleMatrix(theta.rows, theta.columns);
+        class StochasticThread implements Runnable{
+            DoubleMatrix batch;
+            DoubleMatrix outBatch;
+            int i;
+            public StochasticThread(DoubleMatrix batch, DoubleMatrix outBatch, int i) {
+                this.batch = batch;
+                this.outBatch = outBatch;
+                this.i = i;
+            }
+            public void run() {
+                double curAlpha = alpha/(1+(i/T));
+                CostResult result = cost(batch, outBatch, theta);
+                t1Velocity.muli(momentum).addi(result.thetaGrad.mul(curAlpha));
+                theta.subi(t1Velocity);
+            }
+        }
+        for(int i = 0; i < iterations; i++) {
+            System.out.println(i);
+            if(i%100==0) {
+                CostResult result = cost(input, output, theta);
+                System.out.println("Cost "+i+": " + result.cost);
+            }
+            ExecutorService executor = Executors.newFixedThreadPool(Utils.NUMTHREADS);
+            for(int j = 0; j < (input.rows + batchSize-1)/batchSize; j++) {
+                int size = Math.min(batchSize, input.rows-j*batchSize);
+                DoubleMatrix batch = input.getRange(j*batchSize, j*batchSize+size, 0, input.columns);
+                DoubleMatrix outBatch = output.getRange(j*batchSize, j*batchSize+size, 0, output.columns);
+                Runnable worker = new StochasticThread(batch, outBatch, i);
+                executor.execute(worker);
+            }
+            executor.shutdown();
+            while(!executor.isTerminated());
+        }
+        CostResult res = cost(input, output, theta);
+        System.out.println("Final Cost: " + res.cost);
+    }
+
+    public DoubleMatrix getA() {
+        return null;
     }
 
 	public void gradientDescent(DoubleMatrix input, DoubleMatrix output, int iterations, double alpha) {
@@ -234,6 +307,7 @@ public class SoftmaxClassifier extends NeuralNetworkLayer implements DiffFunctio
 		inputSize = input.columns;
 		outputSize = output.columns;
 		initializeParams();
+        //miniBatchGradientDescent(input, output, iterations, 0.9, 128);
 		lbfgsTrain(input, output, iterations);
 		return compute(input);
 		

@@ -15,7 +15,7 @@ public class TestDeepNN {
 
 	@Test
 	public void test() throws IOException, ExceptionWithIflag {
-		SAEImageHandler handler = new SAEImageHandler("train-data.csv", 28*28, 60000);
+		/*SAEImageHandler handler = new SAEImageHandler("train-data.csv", 28*28, 60000);
 		DoubleMatrix input = handler.getImages();
 		SAELabelHandler labelHandler = new SAELabelHandler("train-labels.csv", 60000, 10);
 		DoubleMatrix labels = labelHandler.getLabels();
@@ -29,7 +29,7 @@ public class TestDeepNN {
 		saes[0] = new SparseAutoencoder(input.columns, hiddenSize1, input.columns, sparsityParam, lambda, beta, alpha);
 		saes[1] = new SparseAutoencoder(hiddenSize1, hiddenSize2, hiddenSize1, sparsityParam, lambda, beta, alpha);
 		lambda = 1e-4;
-		SoftmaxClassifier sc = new SoftmaxClassifier(lambda);	
+		SoftmaxClassifier sc = new SoftmaxClassifier(lambda, alpha);
 		DeepNN nn = new DeepNN(saes, sc);
 		nn.train(input, labels, 400);
 		int[][] result = Utils.computeResults(nn.compute(input));
@@ -39,7 +39,7 @@ public class TestDeepNN {
 		labelHandler = new SAELabelHandler("test-labels.csv",10000,10);
 		DoubleMatrix testLabels = labelHandler.getLabels();
 		int[][] testResult = Utils.computeResults(nn.compute(testData));
-		compareResults(testResult, testLabels);
+		compareResults(testResult, testLabels);*/
 	}
 	
 	public void compareResults(int[][] result, DoubleMatrix labels) {

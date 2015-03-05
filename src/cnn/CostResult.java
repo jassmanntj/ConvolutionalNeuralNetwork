@@ -8,6 +8,7 @@ public class CostResult {
 	public DoubleMatrix thetaGrad;
 	public DoubleMatrix biasGrad;
     public double aGrad;
+    public double cost2;
 	
 	public CostResult(double cost, DoubleMatrix thetaGrad, DoubleMatrix biasGrad, DoubleMatrix delta) {
 		this.cost = cost;
@@ -16,8 +17,9 @@ public class CostResult {
 		this.delta = delta;
 	}
 
-    public CostResult(double cost, DoubleMatrix thetaGrad, DoubleMatrix biasGrad, DoubleMatrix delta, double aGrad) {
+    public CostResult(double cost, double cost2, DoubleMatrix thetaGrad, DoubleMatrix biasGrad, DoubleMatrix delta, double aGrad) {
         this.cost = cost;
+        this.cost2 = cost2;
         this.thetaGrad = thetaGrad;
         this.biasGrad = biasGrad;
         this.delta = delta;
@@ -35,6 +37,7 @@ public class CostResult {
 			if(res[i].biasGrad != null) {
 				numElements += res[i].biasGrad.length;
 			}
+            //numElements++;
 		}
 		double[] result = new double[numElements];
 		int l = 0;
@@ -47,6 +50,7 @@ public class CostResult {
 				System.arraycopy(thetaGrad.data, 0, result, l, thetaGrad.data.length);
 				l += thetaGrad.data.length;
 			}
+            //result[l++] = res[i].aGrad;
 		}
 		return result;
 	}
@@ -56,6 +60,7 @@ public class CostResult {
 		for(int i = 0; i < saes.length; i++) {
 			numElements += saes[i].getTheta().length;
 			numElements += saes[i].getBias().length;
+            //numElements ++;
 		}
 		numElements += sc.getTheta().length;
 		double[] thetas = new double[numElements];
@@ -67,6 +72,7 @@ public class CostResult {
 			theta = saes[i].getBias();
 			System.arraycopy(theta.data, 0, thetas, l, theta.data.length);
 			l += theta.data.length;
+            //thetas[l++] = saes[i].getA().get(0);
 		}
 		DoubleMatrix theta = sc.getTheta();
 		System.arraycopy(theta.data, 0, thetas, l, theta.data.length);		
@@ -82,6 +88,7 @@ public class CostResult {
 			theta = saes[i].getBias();
 			System.arraycopy(thetas, l, theta.data, 0, theta.data.length);
 			l += theta.data.length;
+            //saes[i].getA().put(0, thetas[l++]);
 		}
 		DoubleMatrix theta = sc.getTheta();
 		System.arraycopy(thetas, l, theta.data, 0, theta.data.length);

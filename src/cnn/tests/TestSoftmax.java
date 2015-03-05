@@ -16,7 +16,7 @@ public class TestSoftmax {
 		DoubleMatrix input = handler.getImages();
 		SAELabelHandler labelHandler = new SAELabelHandler("train-labels.csv", 6000, 10);
 		DoubleMatrix labels = labelHandler.getLabels();
-		SoftmaxClassifier classifier = new SoftmaxClassifier(0.001);	
+		SoftmaxClassifier classifier = new SoftmaxClassifier(0.001, 0.01);
 		//classifier.lbfgsTrain(input, labels, 50);
 		classifier.gradientDescent(input, labels, 10, 0.3);
 		int[] result = classifier.computeResults(input);

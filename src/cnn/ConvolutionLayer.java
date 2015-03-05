@@ -12,10 +12,12 @@ import org.jblas.DoubleMatrix;
 
 public class ConvolutionLayer extends NeuralNetworkLayer {
 	private int channels;
-	private int patchDim;
+	private int patchRows;
+    private int patchCols;
 	private int imageRows;
 	private int imageCols;
-	private int poolDim;
+	private int poolRows;
+    private int poolCols;
 	private int numPatches;
 	private double sparsityParam;
 	private double lambda;
@@ -24,7 +26,6 @@ public class ConvolutionLayer extends NeuralNetworkLayer {
 	private DoubleMatrix whitenedTheta;
 	private DoubleMatrix whitenedBias;
 	private DoubleMatrix pooledFeatures;
-    private DoubleMatrix convolvedFeatures;
 	private int patchSize;
 	private int imageSize;
 	private int resultRows;
@@ -34,10 +35,12 @@ public class ConvolutionLayer extends NeuralNetworkLayer {
 	
 	public ConvolutionLayer(int channels, int patchDim, int imageRows, int imageCols, int poolDim, int numPatches, double sparsityParam, double lambda, double beta, double alpha, boolean whiten) {
 		this.channels = channels;
-		this.patchDim = patchDim;
+		this.patchRows = patchDim;
+        this.patchCols = patchDim;
+        this.poolRows = poolDim;
+        this.poolCols = poolDim;
 		this.imageRows = imageRows;
 		this.imageCols = imageCols;
-		this.poolDim = poolDim;
 		this.numPatches = numPatches;
 		this.sparsityParam = sparsityParam;
 		this.lambda = lambda;
@@ -46,6 +49,10 @@ public class ConvolutionLayer extends NeuralNetworkLayer {
 		this.whiten = whiten;
         this.patchSize = patchDim*patchDim;
 	}
+
+    public DoubleMatrix getA() {
+        return null;
+    }
 	
 	public ConvolutionLayer(String filename) {
 		try {
@@ -70,26 +77,49 @@ public class ConvolutionLayer extends NeuralNetworkLayer {
 			}
 			imageRows = Integer.parseInt(reader.readLine());
 			imageCols = Integer.parseInt(reader.readLine());
-			patchDim = Integer.parseInt(reader.readLine());
-			poolDim = Integer.parseInt(reader.readLine());
+            patchRows = Integer.parseInt(reader.readLine());
+            patchCols = Integer.parseInt(reader.readLine());
+			poolRows = Integer.parseInt(reader.readLine());
+            poolCols = Integer.parseInt(reader.readLine());
 		}
 		catch(IOException e) {
 			e.printStackTrace();
 		}
 	}
-	
-	public int getOutputSize() {
-		return numPatches * ((imageRows-patchDim+1)/poolDim) * ((imageCols - patchDim+1)/poolDim);
-	}
-	
+
+    public int getOutputRows() {
+        return (imageRows-patchRows+1)/poolRows;
+    }
+
+    public int getOutputColumns() {
+        return (imageCols - patchCols+1)/poolCols;
+    }
+
+    private DoubleMatrix oonv(DoubleMatrix input, DoubleMatrix features) {
+        System.out.println("Starting Convolution");
+        this.imageSize = imageRows*imageCols;
+        DoubleMatrix convolvedFeatures = new DoubleMatrix(images.rows, whitenedTheta.columns * imageRows * imageCols);
+        for(int imageNum = 0; imageNum < images.rows; imageNum++) {
+            DoubleMatrix currentImage = input.getRow(imageNum);
+            DoubleMatrix convolvedImage = new DoubleMatrix(1,0);
+            for (int featureNum = 0; featureNum < whitenedTheta.columns; featureNum++) {
+                DoubleMatrix convolvedFeature = convFeature(currentImage, features, featureNum);
+                convolvedImage = DoubleMatrix.concatHorizontally(convolvedImage, convolvedFeature);
+            }
+            convolvedFeatures.putRow(imageNum, convolvedImage);
+        }
+        return convolvedFeatures;
+    }
+
+
 	private DoubleMatrix convolve() {
 		System.out.println("Starting Convolution");
 		int numFeatures = whitenedTheta.columns;
-		this.resultRows = (imageRows-patchDim+1)/poolDim;
-		this.resultCols = (imageCols-patchDim+1)/poolDim;
+		this.resultRows = (imageRows-patchRows+1)/poolRows;
+		this.resultCols = (imageCols-patchCols+1)/poolCols;
 		this.imageSize = imageRows*imageCols;
 		this.pooledFeatures = new DoubleMatrix(images.rows, numFeatures * (resultRows * resultCols));
-        this.convolvedFeatures = new DoubleMatrix(images.rows, numFeatures * imageRows * imageCols);
+        //this.convolvedFeatures = new DoubleMatrix(images.rows, numFeatures * imageRows * imageCols);
 		ExecutorService executor = Executors.newFixedThreadPool(Utils.NUMTHREADS);
 		for(int imageNum = 0; imageNum < images.rows; imageNum++) {
 			Runnable worker = new ConvolutionThread(imageNum);
@@ -112,28 +142,23 @@ public class ConvolutionLayer extends NeuralNetworkLayer {
 		public void run() {
 			System.out.println("Image: " + imageNum);
 			DoubleMatrix currentImage = images.getRow(imageNum);
-            DoubleMatrix convolvedImage = new DoubleMatrix(1,0);
+            //DoubleMatrix convolvedImage = new DoubleMatrix(1,0);
 			for (int featureNum = 0; featureNum < whitenedTheta.columns; featureNum++) {
-				DoubleMatrix convolvedFeature = null;
-				try {
-					convolvedFeature = convFeature(currentImage, featureNum);
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-                convolvedImage = DoubleMatrix.concatHorizontally(convolvedImage, convolvedFeature);
+				DoubleMatrix convolvedFeature = convFeature(currentImage, whitenedTheta, featureNum);
+                //convolvedImage = DoubleMatrix.concatHorizontally(convolvedImage, convolvedFeature);
                 //convolvedFeatures.putRow(imageNum, convolvedFeature);
 				pool(convolvedFeature, imageNum, featureNum);
 			}
-            convolvedFeatures.putRow(imageNum, convolvedImage);
+            //convolvedFeatures.putRow(imageNum, convolvedImage);
 		}
 
 	}
 	
-	public DoubleMatrix convFeature(DoubleMatrix currentImage, int featureNum) throws IOException {
-		DoubleMatrix convolvedFeature = DoubleMatrix.zeros(imageRows-patchDim+1,imageCols - patchDim+1);
+	public DoubleMatrix convFeature(DoubleMatrix currentImage, DoubleMatrix features, int featureNum) {
+		DoubleMatrix convolvedFeature = DoubleMatrix.zeros(imageRows-patchRows+1,imageCols - patchCols+1);
 		for(int channel = 0; channel < channels; channel++) {
-			DoubleMatrix feature = whitenedTheta.getRange(patchSize*channel, patchSize*channel+patchSize,featureNum, featureNum+1);
-			feature.reshape(patchDim, patchDim);
+			DoubleMatrix feature = features.getRange(patchSize*channel, patchSize*channel+patchSize,featureNum, featureNum+1);
+			feature.reshape(patchRows, patchCols);
 			DoubleMatrix image = currentImage.getRange(0, 1, imageSize*channel,imageSize*channel+imageSize);
 			image.reshape(imageRows, imageCols);
 			DoubleMatrix conv = Utils.conv2d(image, feature);
@@ -145,7 +170,7 @@ public class ConvolutionLayer extends NeuralNetworkLayer {
 	public void pool(DoubleMatrix convolvedFeature, int imageNum, int featureNum) {
 		for(int poolRow = 0; poolRow < resultRows; poolRow++) {
 			for(int poolCol = 0; poolCol < resultCols; poolCol++) {
-				DoubleMatrix patch = convolvedFeature.getRange(poolRow*poolDim, poolRow*poolDim+poolDim, poolCol*poolDim, poolCol*poolDim+poolDim);
+				DoubleMatrix patch = convolvedFeature.getRange(poolRow*poolRows, poolRow*poolRows+poolRows, poolCol*poolCols, poolCol*poolCols+poolCols);
 				pooledFeatures.put(imageNum, featureNum*resultRows*resultCols+poolRow*resultCols+poolCol, patch.mean());
 			}
 		}
@@ -172,7 +197,7 @@ public class ConvolutionLayer extends NeuralNetworkLayer {
 			FileReader fr = new FileReader(filename);
 			@SuppressWarnings("resource")
 			BufferedReader reader = new BufferedReader(fr);
-			pooledFeatures = new DoubleMatrix((imageRows-patchDim+1)/poolDim,(imageCols-patchDim+1)/poolDim);
+			pooledFeatures = new DoubleMatrix((imageRows-patchRows+1)/poolRows,(imageCols-patchCols+1)/poolCols);
 			String[] data = reader.readLine().split(",");
 			for(int i = 0; i < pooledFeatures.data.length; i++) {
 				pooledFeatures.data[i] = Double.parseDouble(data[i]);
@@ -207,16 +232,29 @@ public class ConvolutionLayer extends NeuralNetworkLayer {
 			}
 			imageRows = Integer.parseInt(reader.readLine());
 			imageCols = Integer.parseInt(reader.readLine());
-			patchDim = Integer.parseInt(reader.readLine());
-			poolDim = Integer.parseInt(reader.readLine());
+			patchRows = Integer.parseInt(reader.readLine());
+            patchCols = Integer.parseInt(reader.readLine());
+			poolRows = Integer.parseInt(reader.readLine());
+            poolCols = Integer.parseInt(reader.readLine());
 			reader.close();
 		}
 		catch(IOException e) {
 			e.printStackTrace();
 		}
 	}
-	
-	public void writeLayer(String filename) {
+
+    @Override
+    public DoubleMatrix feedForward(DoubleMatrix input) {
+        this.images = input;
+        return oonv(input, whitenedTheta);
+    }
+
+    @Override
+    public DoubleMatrix backPropagation(DoubleMatrix[] results, int layer, DoubleMatrix y, double momentum, double alpha) {
+        DoubleMatrix delta = oonv(results[layer-1], y);
+    }
+
+    public void writeLayer(String filename) {
 		try {
 			FileWriter fw = new FileWriter(filename);
 			BufferedWriter writer = new BufferedWriter(fw);
@@ -232,7 +270,7 @@ public class ConvolutionLayer extends NeuralNetworkLayer {
 					writer.write(whitenedBias.get(i,j)+",");
 				}
 			}
-			writer.write("\n"+imageRows+"\n"+imageCols+"\n"+patchDim+"\n"+poolDim);
+			writer.write("\n"+imageRows+"\n"+imageCols+"\n"+patchRows+"\n"+patchCols+"\n"+poolRows+"\n"+poolCols);
 			writer.close();
 		}
 		catch(IOException e) {
@@ -259,10 +297,10 @@ public class ConvolutionLayer extends NeuralNetworkLayer {
 
 	@Override
 	public DoubleMatrix train(DoubleMatrix input, DoubleMatrix output, int iterations) {
-        int inputSize = patchDim*patchDim*channels;
+        //int inputSize = patchDim*patchDim*channels;
 		//SparseAutoencoder ae = new SparseAutoencoder(inputSize, numPatches, inputSize, sparsityParam, lambda, beta, alpha);
-        LinearDecoder ae = new LinearDecoder(patchDim, channels, numPatches, sparsityParam, lambda, beta, alpha);
-		DoubleMatrix patches = ImageLoader.sample(patchDim, 100000, input, imageCols, imageRows, channels);
+        LinearDecoder ae = new LinearDecoder(patchRows, patchCols, channels, numPatches, sparsityParam, lambda, beta, alpha, Utils.PRELU, Utils.NONE);
+		DoubleMatrix patches = ImageLoader.sample(patchRows, patchCols, 100000, input, imageCols, imageRows, channels);
         //try {
             if(whiten) {
                 patches.divi(patches.max());

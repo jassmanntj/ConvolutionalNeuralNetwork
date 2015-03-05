@@ -9,11 +9,11 @@ import org.jblas.DoubleMatrix;
 import edu.stanford.nlp.optimization.DiffFunction;
 
 public class DeepNN extends NeuralNetworkLayer implements DiffFunction {
-	private SparseAutoencoder[] saes;
+	private LinearDecoder[] saes;
 	private SoftmaxClassifier sc;
 	private DoubleMatrix input;
 	private DoubleMatrix labels;
-	public DeepNN(SparseAutoencoder[] saes, SoftmaxClassifier sc) {
+	public DeepNN(LinearDecoder[] saes, SoftmaxClassifier sc) {
 		this.saes = saes;
 		this.sc = sc;
 	}
@@ -40,6 +40,7 @@ public class DeepNN extends NeuralNetworkLayer implements DiffFunction {
 				LBFGS.lbfgs(thetas.length, 5, thetas, result[result.length-1].cost, thetaGrads, false, diag, iprint, 1e-5, 1e-9, iflag);
 			} catch (numerical.LBFGS.ExceptionWithIflag e) {
 				e.printStackTrace();
+                break;
 			}
 			CostResult.setThetas(saes, sc, thetas);
 
@@ -90,11 +91,11 @@ public class DeepNN extends NeuralNetworkLayer implements DiffFunction {
 		CostResult softMaxCost = sc.cost(results[saes.length], output);
 		costResults[saes.length] = softMaxCost; 
 		DoubleMatrix lastDelta = softMaxCost.delta;
-		DoubleMatrix lastTheta = sc.getTheta();
+        double lastAlpha = 0;
 		for(int i = saes.length-1; i >= 0; i--) {
-			CostResult costRes = saes[i].stackedCost(results[i], results[i+1], lastDelta, lastTheta);
+			CostResult costRes = saes[i].stackedCost(results[i], lastDelta, lastAlpha);
 			lastDelta = costRes.delta;
-			lastTheta = saes[i].getTheta();
+            lastAlpha = costRes.aGrad;
 			costResults[i] = costRes;
 		}
 		return costResults;
@@ -137,6 +138,10 @@ public class DeepNN extends NeuralNetworkLayer implements DiffFunction {
 		return null;
 	}
 
+    public DoubleMatrix getA() {
+        return null;
+    }
+
 	@Override
 	public void writeTheta(String filename) {
 		for(int i = 0; i < saes.length; i++) {
@@ -171,4 +176,9 @@ public class DeepNN extends NeuralNetworkLayer implements DiffFunction {
 		}
 		sc.loadLayer(saes.length+filename);
 	}
+
+    @Override
+    public DoubleMatrix feedForward(DoubleMatrix input) {
+        return null;
+    }
 }

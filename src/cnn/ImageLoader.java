@@ -31,10 +31,6 @@ public class ImageLoader {
 	ArrayList<String> names;
 	
 	public void loadFolder(File folder, int channels, int width, int height, HashMap<String, Double> labelMap) throws IOException {
-		images = null;
-		photoImages = null;
-		labels = null;
-		photoLabels = null;
 		int z = 0;
 		this.channels = channels;
 		this.width = width;
@@ -42,105 +38,166 @@ public class ImageLoader {
 		this.labelMap = labelMap;
 		this.photoNames = new ArrayList<String>();
 		this.names = new ArrayList<String>();
+        int[] counts = countImages(folder, labelMap);
+        images = new DoubleMatrix(counts[0],height*width*channels);
+        photoImages = new DoubleMatrix(counts[1], height*width*channels);
+        labels = new DoubleMatrix(counts[0], labelMap.size());
+        photoLabels = new DoubleMatrix(counts[1], labelMap.size());
+        DoubleMatrix imageNo = new DoubleMatrix(counts[0]);
+        for(int i = 0; i < imageNo.length; i++) {
+            imageNo.put(i, i);
+        }
+        Random rand = new Random(System.currentTimeMillis());
+        for(int i = 0; i < 10000; i++) {
+            if(i%1000==0) System.out.println(i);
+            int a = rand.nextInt(images.rows);
+            int b = rand.nextInt(images.rows);
+            imageNo.swapRows(a, b);
+        }
+        int i = 0;
+        int j = 0;
+        ExecutorService executor = Executors.newFixedThreadPool(Utils.NUMTHREADS);
 		for(File leaf : folder.listFiles()) {
-			if(leaf.isDirectory()) {
-				System.out.println(z++ +":"+leaf.getName());
+			if(leaf.isDirectory() && labelMap.containsKey(leaf.getName())) {
+				//System.out.println(z++ +":"+leaf.getName());
 				for(File photos : leaf.listFiles()) {
 					//if(photos.getName().equals("photograph")) {
 						for(File image : photos.listFiles()) {
-							BufferedImage img = ImageIO.read(image);
-							int[] pixels = new int[1];
-							if(img.getHeight() < img.getWidth()) {
-								img = Scalr.rotate(img, Rotation.CW_90);
-							}
-							if(img.getHeight() * 3 < img.getWidth() * 4) {
-								BufferedImage newImage = new BufferedImage(img.getWidth(), img.getWidth()*4/3, img.getType());
-								Graphics g = newImage.getGraphics();
-								g.setColor(Color.black);
-								g.fillRect(0,0,newImage.getWidth(),newImage.getHeight());
-								g.drawImage(img, 0, (newImage.getHeight() - img.getHeight())/2, null);
-								g.dispose();
-								img =  newImage;
-								newImage.flush();
-							}
-							else if(img.getHeight() * 3 > img.getWidth() * 4) {
-								BufferedImage newImage = new BufferedImage(img.getHeight() * 3/4, img.getHeight(), img.getType());
-								Graphics g = newImage.getGraphics();
-								g.setColor(Color.black);
-								g.fillRect(0,0,newImage.getWidth(),newImage.getHeight());
-								g.drawImage(img, (newImage.getWidth() - img.getWidth())/2, 0, null);
-								g.dispose();
-								img =  newImage;
-								newImage.flush();
-							}
-							img = Scalr.resize(img, Method.QUALITY, width, height);
-							pixels = ((DataBufferInt)img.getRaster().getDataBuffer()).getData();
-							img.flush();
-							if(pixels.length==width*height) {
-								DoubleMatrix row = new DoubleMatrix(1, pixels.length*channels);
-								DoubleMatrix lRow = new DoubleMatrix(1,1);
-								lRow.put(0, labelMap.get(leaf.getName()));
-								for(int i = 0; i < pixels.length; i++) {
-									for(int j = 0; j < channels; j++) {
-										row.put(j*pixels.length+i, ((pixels[i]>>>(8*j)) & 0xFF));
-									}
-								}
-								if(images == null) {
-									images = row;
-									labels = lRow;
-								}
-								else {
-									labels = DoubleMatrix.concatVertically(labels, lRow);
-									images = DoubleMatrix.concatVertically(images, row);
-								}
-								names.add(image.getName());
-								if(photos.getName().equals("photograph")) {
-									photoNames.add(image.getName());
-									if(photoImages == null) {
-										photoImages = row;
-										photoLabels = lRow;
-									}
-									else {
-										photoImages = DoubleMatrix.concatVertically(photoImages, row);
-										photoLabels = DoubleMatrix.concatVertically(photoLabels, lRow);
-									}
-								}
-								
-							}
+                            boolean photo = photos.getName().equals("photograph");
+                            Runnable ip = new ImageProcessor(image, i, j, labelMap.get(leaf.getName()), photo, imageNo);
+                            executor.execute(ip);
+                            i++;
+                            if(photo) j++;
 						}
 					//}
 				}
 			}
 		}
+        executor.shutdown();
+        while(!executor.isTerminated());
 	}
+
+    private class ImageProcessor implements Runnable {
+        private File image;
+        private double leafNo;
+        private int num;
+        private int photoNum;
+        private int imgNo;
+        private boolean photo;
+
+        public ImageProcessor(File image, int num, int photoNum, double leafNo, boolean photo, DoubleMatrix imageNo) {
+            this.image = image;
+            this.num = (int)imageNo.get(num);
+            this.imgNo = num;
+
+            this.leafNo = leafNo;
+            this.photo = photo;
+            this.photoNum = photoNum;
+        }
+
+        public void run() {
+            try {
+                BufferedImage img = ImageIO.read(image);
+                if (img.getHeight() < img.getWidth()) {
+                    img = Scalr.rotate(img, Rotation.CW_90);
+                }
+                if (img.getHeight() * 3 < img.getWidth() * 4) {
+                    BufferedImage newImage = new BufferedImage(img.getWidth(), img.getWidth() * 4 / 3, img.getType());
+                    Graphics g = newImage.getGraphics();
+                    g.setColor(Color.black);
+                    g.fillRect(0, 0, newImage.getWidth(), newImage.getHeight());
+                    g.drawImage(img, 0, (newImage.getHeight() - img.getHeight()) / 2, null);
+                    g.dispose();
+                    img = newImage;
+                    newImage.flush();
+                } else if (img.getHeight() * 3 > img.getWidth() * 4) {
+                    BufferedImage newImage = new BufferedImage(img.getHeight() * 3 / 4, img.getHeight(), img.getType());
+                    Graphics g = newImage.getGraphics();
+                    g.setColor(Color.black);
+                    g.fillRect(0, 0, newImage.getWidth(), newImage.getHeight());
+                    g.drawImage(img, (newImage.getWidth() - img.getWidth()) / 2, 0, null);
+                    g.dispose();
+                    img = newImage;
+                    newImage.flush();
+                }
+                img = Scalr.resize(img, Method.QUALITY, width, height);
+                int[] pixels = ((DataBufferInt) img.getRaster().getDataBuffer()).getData();
+                img.flush();
+                if (pixels.length == width * height) {
+                    for (int i = 0; i < pixels.length; i++) {
+                        for (int j = 0; j < channels; j++) {
+                            images.put(num, j * pixels.length + i, ((pixels[i] >>> (8 * j)) & 0xFF));
+                            if (photo) {
+                                photoImages.put(photoNum, j * pixels.length + i, ((pixels[i] >>> (8 * j)) & 0xFF));
+                            }
+                        }
+                    }
+                    labels.put(num, (int)leafNo, 1);
+                    if (photo) {
+                        photoLabels.put(photoNum, (int)leafNo, 1);
+                    }
+                }
+                System.out.println(imgNo);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public void randomizeImages(int iterations) {
+        Random rand = new Random(System.currentTimeMillis());
+        for(int i = 0; i < iterations; i++) {
+            System.out.println(i);
+            int a = rand.nextInt(images.rows);
+            int b = rand.nextInt(images.rows);
+            images.swapRows(a, b);
+            labels.swapRows(a, b);
+        }
+    }
+
+
+    private int[] countImages(File folder, HashMap<String, Double> labelMap) {
+        int count[] = new int[2];
+        for(File leaf : folder.listFiles()) {
+            if (leaf.isDirectory() && labelMap.containsKey(leaf.getName())) {
+                for (File photos : leaf.listFiles()) {
+                    //if(photos.getName().equals("photograph")) {
+                    for (File image : photos.listFiles()) {
+                        count[0]++;
+                        if(photos.getName().equals("photograph")) count[1]++;
+                    }
+                }
+            }
+        }
+        return count;
+    }
 	
 	public DoubleMatrix getPhotoImages() {
 		return photoImages;
 	}	
 	public DoubleMatrix getPhotoLabels() {
-		DoubleMatrix expandLabels = DoubleMatrix.zeros(photoLabels.rows, labelMap.size());
+		/*DoubleMatrix expandLabels = DoubleMatrix.zeros(photoLabels.rows, labelMap.size());
 		for(int i = 0; i < photoLabels.rows; i++) {
 			expandLabels.put(i, (int)photoLabels.get(i),1);
 		}
-		return expandLabels;
+		return expandLabels;*/
+        return photoLabels;
 	}
 	public ArrayList<String> getNames(File folder) {
-		if(names == null) {
-			names = new ArrayList<String>();
-			photoNames = new ArrayList<String>();
-			for(File leaf : folder.listFiles()) {
-				if(leaf.isDirectory()) {
-					for(File photos : leaf.listFiles()) {
-						for(File image : photos.listFiles()) {
-							names.add(image.getName());
-							if(photos.getName().equals("photograph")) {
-								photoNames.add(image.getName());
-							}
+		names = new ArrayList<String>();
+		photoNames = new ArrayList<String>();
+		for(File leaf : folder.listFiles()) {
+			if(leaf.isDirectory()) {
+				for(File photos : leaf.listFiles()) {
+					for(File image : photos.listFiles()) {
+						names.add(image.getName());
+						if(photos.getName().equals("photograph")) {
+							photoNames.add(image.getName());
 						}
 					}
 				}
 			}
-		}
+        }
 		return names;
 	}
 	public ArrayList<String> getPhotoNames() {
@@ -180,15 +237,13 @@ public class ImageLoader {
 		return normalizeData(patches);
 	}
 
-    public static DoubleMatrix sample(final int patchSize, final int numPatches, final DoubleMatrix images, final int width, final int height, final int channels) {
-        DoubleMatrix patches = new DoubleMatrix(numPatches, patchSize*patchSize*channels);
+    public static DoubleMatrix sample(final int patchRows, final int patchCols, final int numPatches, final DoubleMatrix images, final int width, final int height, final int channels) {
+        final DoubleMatrix patches = new DoubleMatrix(numPatches, patchRows*patchCols*channels);
         class Patcher implements Runnable {
             private int threadNo;
-            private DoubleMatrix patches;
 
-            public Patcher(int threadNo, DoubleMatrix patches) {
+            public Patcher(int threadNo) {
                 this.threadNo = threadNo;
-                this.patches = patches;
             }
 
             @Override
@@ -199,15 +254,15 @@ public class ImageLoader {
                         System.out.println(threadNo+":"+i);
                     Random rand = new Random();
                     int randomImage = rand.nextInt(images.rows);
-                    int randomY = rand.nextInt(height - patchSize + 1);
-                    int randomX = rand.nextInt(width - patchSize + 1);
+                    int randomY = rand.nextInt(height - patchRows + 1);
+                    int randomX = rand.nextInt(width - patchCols + 1);
                     int imageSize = width * height;
                     DoubleMatrix patch = null;
                     for (int j = 0; j < channels; j++) {
                         DoubleMatrix channel = images.getRange(randomImage, randomImage + 1, j * imageSize, (j + 1) * imageSize);
                         channel = channel.reshape(width, height);
-                        channel = channel.getRange(randomY, randomY + patchSize, randomX, randomX + patchSize);
-                        channel = channel.reshape(1, patchSize * patchSize);
+                        channel = channel.getRange(randomY, randomY + patchRows, randomX, randomX + patchCols);
+                        channel = channel.reshape(1, patchRows * patchCols);
                         if (patch == null) {
                             patch = channel;
                         } else {
@@ -222,7 +277,7 @@ public class ImageLoader {
         for(int i = 0; i < Utils.NUMTHREADS; i++) {
             if (i % 1000 == 0)
                 System.out.println(i);
-            Runnable patcher = new Patcher(i, patches);
+            Runnable patcher = new Patcher(i);
             executor.execute(patcher);
         }
         executor.shutdown();
@@ -258,11 +313,12 @@ public class ImageLoader {
 	}
 	
 	public DoubleMatrix getLabels() {
-		DoubleMatrix expandLabels = DoubleMatrix.zeros(labels.rows, labelMap.size());
-		for(int i = 0; i < labels.rows; i++) {
-			expandLabels.put(i, (int)labels.get(i),1);
-		}
-		return expandLabels;
+		//DoubleMatrix expandLabels = DoubleMatrix.zeros(labels.rows, labelMap.size());
+		//for(int i = 0; i < labels.rows; i++) {
+		//	expandLabels.put(i, (int)labels.get(i),1);
+		//}
+		//return expandLabels;
+        return labels;
 	}
 	
 	public HashMap<String, Double> getLabelMap(File folder) {

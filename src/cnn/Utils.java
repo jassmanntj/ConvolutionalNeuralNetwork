@@ -158,6 +158,22 @@ public class Utils {
         }
     }
 
+    public static double aGrad(int type, DoubleMatrix result) {
+        return aGrad(type, result, null);
+    }
+
+    public static double aGrad(int type, DoubleMatrix result, DoubleMatrix delta) {
+        switch(type) {
+            case PRELU:
+                if(delta != null) return result.le(0).mul(result).mul(delta).mean();
+                else return result.le(0).mul(result).mean();
+            case SIGMOID: return 0;
+            case RELU: return 0;
+            case NONE: return 0;
+            default: return 0;
+        }
+    }
+
     public static DoubleMatrix activationFunction(int type, DoubleMatrix z) {
         return activationFunction(type, z, 0.25);
     }
@@ -167,6 +183,7 @@ public class Utils {
     }
 
     public static DoubleMatrix prelu(DoubleMatrix z, double a) {
+       //return z.le(0).mul(a-1).add(1).mul(z);
         DoubleMatrix res = z.dup();
         for(int i = 0; i < res.rows; i++) {
             for(int j = 0; j < res.columns; j++) {
@@ -182,8 +199,9 @@ public class Utils {
     }
 
     public static DoubleMatrix preluGradient(DoubleMatrix z, double a) {
+        //return z.le(0).mul(a-1).add(1);
         DoubleMatrix res = new DoubleMatrix(z.rows, z.columns);
-        for(int i = 0; i < z.columns; i++) {
+        for(int i = 0; i < z.rows; i++) {
             for(int j = 0; j < z.columns; j++) {
                 double k = z.get(i,j);
                 if(k > 0) res.put(i,j,1);
@@ -202,7 +220,7 @@ public class Utils {
 	}
 	
 	public static DoubleMatrix sigmoidGradient(DoubleMatrix a) {
-		return a.rsub(1).mul(a);
+        return a.neg().add(1).mul(a);
 	}
 	
 	public static int[][] computeResults(DoubleMatrix result) {
