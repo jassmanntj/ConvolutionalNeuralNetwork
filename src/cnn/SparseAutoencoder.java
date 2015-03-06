@@ -485,5 +485,10 @@ public class SparseAutoencoder extends NeuralNetworkLayer implements DiffFunctio
         return null;
     }
 
+    @Override
+    public DoubleMatrix backPropagation(DoubleMatrix[] results, int layer, DoubleMatrix y, double momentum, double alpha) {
+        return null;
+    }
+
 }
 

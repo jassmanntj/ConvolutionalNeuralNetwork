@@ -252,6 +252,8 @@ public class ConvolutionLayer extends NeuralNetworkLayer {
     @Override
     public DoubleMatrix backPropagation(DoubleMatrix[] results, int layer, DoubleMatrix y, double momentum, double alpha) {
         DoubleMatrix delta = oonv(results[layer-1], y);
+        whitenedTheta.subi(delta);
+        return delta;
     }
 
     public void writeLayer(String filename) {

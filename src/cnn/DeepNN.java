@@ -179,6 +179,17 @@ public class DeepNN extends NeuralNetworkLayer implements DiffFunction {
 
     @Override
     public DoubleMatrix feedForward(DoubleMatrix input) {
-        return null;
+        for(int i = 0; i < saes.length; i++) {
+            input = saes[i].feedForward(input);
+        }
+        return sc.feedForward(input);
+    }
+
+    @Override
+    public DoubleMatrix backPropagation(DoubleMatrix[] results, int layer, DoubleMatrix y, double momentum, double alpha) {
+        for(int i = 0; i < saes.length; i++) {
+            y = saes[i].backPropagation(results, layer, y , momentum, alpha);
+        }
+        return sc.backPropagation(results, layer, y , momentum, alpha);
     }
 }
