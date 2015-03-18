@@ -35,8 +35,17 @@ public class SoftmaxClassifier extends NeuralNetworkLayer implements DiffFunctio
         this.cost = 0;
         initializeParams();
 	}
-	
-	public DoubleMatrix getTheta() {
+
+    public SoftmaxClassifier(double lambda, double alpha, int inputSize, int outputSize) {
+        this.lambda = lambda;
+        this.alpha = alpha;
+        this.cost = 0;
+        this.inputSize = inputSize;
+        this.outputSize = outputSize;
+        initializeParams();
+    }
+
+    public DoubleMatrix getTheta() {
 		return theta;
 	}
 	
@@ -82,8 +91,8 @@ public class SoftmaxClassifier extends NeuralNetworkLayer implements DiffFunctio
         return cost;
     }
 
-    public DoubleMatrix backPropagation(DoubleMatrix[] results, int layer, DoubleMatrix y, double momentum, double alpha) {
-        CostResult res = cost(results[layer-1], y, theta);
+    public DoubleMatrix backPropagation(DataContainer[] results, int layer, DoubleMatrix y, double momentum, double alpha) {
+        CostResult res = cost(results[layer-1].getData(), y, theta);
         t1Velocity.muli(momentum).addi(res.thetaGrad.mul(alpha));
         theta.subi(t1Velocity);
         return res.delta;
@@ -193,8 +202,8 @@ public class SoftmaxClassifier extends NeuralNetworkLayer implements DiffFunctio
 			e.printStackTrace();
 		}
 	}
-	
-	public void writeLayer(String filename) {
+
+    public void writeLayer(String filename) {
 		try {
 			FileWriter fw = new FileWriter(filename);
 			BufferedWriter writer = new BufferedWriter(fw);
@@ -230,25 +239,11 @@ public class SoftmaxClassifier extends NeuralNetworkLayer implements DiffFunctio
 			e.printStackTrace();
 		}
 	}
-	
-	public DoubleMatrix loadTheta(String filename, DoubleMatrix input) {
-		try {
-			FileReader fr = new FileReader(filename);
-			@SuppressWarnings("resource")
-			BufferedReader reader = new BufferedReader(fr);
-			String[] thetaSize = reader.readLine().split(",");
-			theta = new DoubleMatrix(Integer.parseInt(thetaSize[0]),Integer.parseInt(thetaSize[1]));
-			String[] data = reader.readLine().split(",");
-			assert data.length == theta.data.length;
-			for(int i = 0; i < theta.data.length; i++) {
-				theta.data[i] = Double.parseDouble(data[i]);
-			}
-		}
-		catch(IOException e) {
-			e.printStackTrace();
-		}
-		return compute(input);
-	}
+
+    @Override
+    public DataContainer feedForward(DataContainer input) {
+        return new DataContainer(feedForward(input.getData()));
+    }
 	
 	public void loadTheta(String filename) {
 		try {
@@ -303,19 +298,19 @@ public class SoftmaxClassifier extends NeuralNetworkLayer implements DiffFunctio
 	}
 
 	@Override
-	public DoubleMatrix train(DoubleMatrix input, DoubleMatrix output, int iterations) {
+	public DataContainer train(DataContainer in, DoubleMatrix output, int iterations) {
+        DoubleMatrix input = in.getData();
 		inputSize = input.columns;
 		outputSize = output.columns;
 		initializeParams();
         //miniBatchGradientDescent(input, output, iterations, 0.9, 128);
 		lbfgsTrain(input, output, iterations);
-		return compute(input);
+		return compute(in);
 		
 	}
 
-	@Override
-	public DoubleMatrix compute(DoubleMatrix input) {
-		return input.mmul(theta);
+	public DataContainer compute(DataContainer input) {
+		return new DataContainer(input.getData().mmul(theta));
 	}
 
 	@Override

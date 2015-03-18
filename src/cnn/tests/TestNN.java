@@ -2,7 +2,6 @@ package cnn.tests;
 
 import cnn.NeuralNetwork;
 import cnn.SoftmaxClassifier;
-import cnn.SparseAutoencoder;
 import numerical.LBFGS.ExceptionWithIflag;
 import org.jblas.DoubleMatrix;
 import org.junit.Test;
@@ -13,7 +12,7 @@ public class TestNN {
 
 	@Test
 	public void test() throws IOException, ExceptionWithIflag {
-		SAEImageHandler handler = new SAEImageHandler("trainData", 28*28, 15298);
+		/*SAEImageHandler handler = new SAEImageHandler("trainData", 28*28, 15298);
 		DoubleMatrix input = handler.getImages();
 		handler = new SAEImageHandler("unlabeledData", 28*28, 29404);
 		DoubleMatrix unlabeledData = handler.getImages();
@@ -36,7 +35,7 @@ public class TestNN {
 		labelHandler = new SAELabelHandler("testLabels",15298,5);
 		DoubleMatrix testLabels = labelHandler.getLabels();
 		int[] testResult = nn.compute(testData);
-		compareResults(testResult, testLabels);
+		compareResults(testResult, testLabels);*/
 	}
 	
 	public void compareResults(int[] result, DoubleMatrix labels) {

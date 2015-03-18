@@ -30,12 +30,13 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 import cnn.*;
+import com.sun.jndi.ldap.pool.Pool;
 import org.jblas.DoubleMatrix;
 
 public class LeafCNN {
 	private static final boolean load = false;
-	DoubleMatrix images;
-	DoubleMatrix photoTrain;
+	DataContainer images;
+	DataContainer photoTrain;
 	DoubleMatrix labels;
 	DoubleMatrix photoLabels;
 	DoubleMatrix testImages;
@@ -90,27 +91,29 @@ public class LeafCNN {
 		else {
 			labels = new DoubleMatrix("data/TrainLabels.mat");
 			photoLabels = new DoubleMatrix("data/PhotoTrainLabels.mat");
-			photoTrain = new DoubleMatrix("data/PhotoTrain.mat");
-			images = new DoubleMatrix("data/Train.mat");
+			photoTrain = new DataContainer(new DoubleMatrix("data/PhotoTrain.mat"));
+			images = new DataContainer(new DoubleMatrix("data/Train.mat"));
 		}
 
 
 		ConvolutionLayer cl = new ConvolutionLayer(channels, patchSize, imageRows, imageColumns, poolSize, numPatches, sparsityParam, lambda, beta, alpha, true);
 		//ConvolutionLayer cl2 = new ConvolutionLayer(channels2, patchSize2, imageRows2, imageColumns2, poolSize2, numPatches2, sparsityParam, lambda, beta, alpha, true);
 		LinearDecoder ae2 = new LinearDecoder(cl.getOutputRows(), cl.getOutputColumns(), numPatches, hiddenSize, sparsityParam, lambda, beta, alpha/50000, Utils.PRELU, Utils.NONE);
-        SoftmaxClassifier sc = new SoftmaxClassifier(1e-4, alpha);
-		LinearDecoder[] saes = {ae2};
-		DeepNN dn = new DeepNN(saes, sc);
-		NeuralNetworkLayer[] nnl = {cl, dn};
+        PoolingLayer pl = new PoolingLayer(poolSize, numPatches);
+        SoftmaxClassifier sc = new SoftmaxClassifier(1e-4, alpha, hiddenSize ,labels.columns);
+		//LinearDecoder[] saes = {ae2};
+		//DeepNN dn = new DeepNN(saes, sc);
+		NeuralNetworkLayer[] nnl = {cl, pl, ae2, sc};
 		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(nnl, resFile);
-		
-		DoubleMatrix result = cnn.train(images, labels, iterations);
-		int[][] results = Utils.computeResults(result);
-        System.out.println("RESULT: "+result.rows+"X"+result.columns);
+		cnn.fineTune(images, labels, iterations, alpha, 16);
+        DataContainer result = cnn.computeRes(images);
+        //DoubleMatrix result = cnn.train(images, labels, iterations);
+		int[][] results = Utils.computeResults(result.getDataArray());
+        System.out.println("RESULT: "+result.rows()+"X"+result.columns());
         System.out.println("LABELS: "+labels.rows+"X"+labels.columns);
 		System.out.println("TRAIN");
         compareResults(results, labels);
-
+/*
 		folder = new File("C:/Users/jassmanntj/Desktop/TestSort");
 		if(!load) {
 			loader.loadFolder(folder,channels,imageColumns, imageRows,labelMap);
@@ -143,7 +146,7 @@ public class LeafCNN {
 		writeResults(testRes, testLabels, fileNames, resFile);
 		System.out.println("PHOTOTEST");
 		compareResults(photoTestResult, photoTestLabels);
-		writeResults(photoTestRes, photoTestLabels, photoFiles, "Photo"+resFile);
+		writeResults(photoTestRes, photoTestLabels, photoFiles, "Photo"+resFile);*/
 	}
 	
 	public void compareResults(int[][] result, DoubleMatrix labels) {

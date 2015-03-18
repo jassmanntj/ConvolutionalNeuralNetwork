@@ -13,6 +13,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import javax.imageio.ImageIO;
+import javax.xml.crypto.Data;
 
 import org.jblas.DoubleMatrix;
 import org.imgscalr.Scalr;
@@ -20,12 +21,12 @@ import org.imgscalr.Scalr.Method;
 import org.imgscalr.Scalr.Rotation;
 
 public class ImageLoader {
-	DoubleMatrix images;
+	DoubleMatrix[][] images;
 	DoubleMatrix labels;
 	int channels;
 	int width, height;
 	HashMap<String, Double> labelMap;
-	DoubleMatrix photoImages;
+	DoubleMatrix[][] photoImages;
 	DoubleMatrix photoLabels;
 	ArrayList<String> photoNames;
 	ArrayList<String> names;
@@ -39,8 +40,8 @@ public class ImageLoader {
 		this.photoNames = new ArrayList<String>();
 		this.names = new ArrayList<String>();
         int[] counts = countImages(folder, labelMap);
-        images = new DoubleMatrix(counts[0],height*width*channels);
-        photoImages = new DoubleMatrix(counts[1], height*width*channels);
+        images = new DoubleMatrix[counts[0]][channels];
+        photoImages = new DoubleMatrix[counts[1]][channels];
         labels = new DoubleMatrix(counts[0], labelMap.size());
         photoLabels = new DoubleMatrix(counts[1], labelMap.size());
         DoubleMatrix imageNo = new DoubleMatrix(counts[0]);
@@ -50,8 +51,8 @@ public class ImageLoader {
         Random rand = new Random(System.currentTimeMillis());
         for(int i = 0; i < 10000; i++) {
             if(i%1000==0) System.out.println(i);
-            int a = rand.nextInt(images.rows);
-            int b = rand.nextInt(images.rows);
+            int a = rand.nextInt(images.length);
+            int b = rand.nextInt(images.length);
             imageNo.swapRows(a, b);
         }
         int i = 0;
@@ -126,9 +127,11 @@ public class ImageLoader {
                 if (pixels.length == width * height) {
                     for (int i = 0; i < pixels.length; i++) {
                         for (int j = 0; j < channels; j++) {
-                            images.put(num, j * pixels.length + i, ((pixels[i] >>> (8 * j)) & 0xFF));
+                            if(images[num][j] == null) images[num][j] = new DoubleMatrix(height,width);
+                            images[num][j].put(i, ((pixels[i] >>> (8 * j)) & 0xFF));
                             if (photo) {
-                                photoImages.put(photoNum, j * pixels.length + i, ((pixels[i] >>> (8 * j)) & 0xFF));
+                                if(photoImages[photoNum][j] == null) photoImages[photoNum][j] = new DoubleMatrix(height,width);
+                                photoImages[photoNum][j].put(i, ((pixels[i] >>> (8 * j)) & 0xFF));
                             }
                         }
                     }
@@ -143,18 +146,6 @@ public class ImageLoader {
             }
         }
     }
-
-    public void randomizeImages(int iterations) {
-        Random rand = new Random(System.currentTimeMillis());
-        for(int i = 0; i < iterations; i++) {
-            System.out.println(i);
-            int a = rand.nextInt(images.rows);
-            int b = rand.nextInt(images.rows);
-            images.swapRows(a, b);
-            labels.swapRows(a, b);
-        }
-    }
-
 
     private int[] countImages(File folder, HashMap<String, Double> labelMap) {
         int count[] = new int[2];
@@ -172,8 +163,8 @@ public class ImageLoader {
         return count;
     }
 	
-	public DoubleMatrix getPhotoImages() {
-		return photoImages;
+	public DataContainer getPhotoImages() {
+		return new DataContainer(photoImages);
 	}	
 	public DoubleMatrix getPhotoLabels() {
 		/*DoubleMatrix expandLabels = DoubleMatrix.zeros(photoLabels.rows, labelMap.size());
@@ -203,42 +194,10 @@ public class ImageLoader {
 	public ArrayList<String> getPhotoNames() {
 		return photoNames;
 	}
-	
-	public static DoubleMatrix sampleS(int patchSize, int numPatches, DoubleMatrix images, int width, int height, int channels) {
-		Random rand = new Random();
-		DoubleMatrix patches = null;
-		for(int i = 0; i < numPatches; i++) {
-			if(i%1000==0)
-				System.out.println(i);
-			int randomImage = rand.nextInt(images.rows);
-			int randomY = rand.nextInt(height-patchSize+1);
-			int randomX = rand.nextInt(width-patchSize+1);
-			int imageSize = width*height;
-			DoubleMatrix patch = null;
-			for(int j = 0; j < channels; j++) {
-				DoubleMatrix channel = images.getRange(randomImage, randomImage+1, j*imageSize, (j+1)*imageSize);
-				channel = channel.reshape(width, height);
-				channel = channel.getRange(randomY, randomY+patchSize, randomX, randomX+patchSize);
-				channel = channel.reshape(1,  patchSize*patchSize);
-				if(patch == null) {
-					patch = channel;
-				}
-				else {
-					patch = DoubleMatrix.concatHorizontally(patch, channel);
-				}
-			}
-			if(patches == null) {
-				patches = patch;
-			}
-			else {
-				patches = DoubleMatrix.concatVertically(patches, patch);
-			}
-		}
-		return normalizeData(patches);
-	}
 
-    public static DoubleMatrix sample(final int patchRows, final int patchCols, final int numPatches, final DoubleMatrix images, final int width, final int height, final int channels) {
-        final DoubleMatrix patches = new DoubleMatrix(numPatches, patchRows*patchCols*channels);
+    public static DataContainer sample(final int patchRows, final int patchCols, final int numPatches, final DataContainer im, final int width, final int height, final int channels) {
+        final DoubleMatrix[][] patches = new DoubleMatrix[numPatches][channels];
+        final DoubleMatrix[][] images = im.getDataArray();
         class Patcher implements Runnable {
             private int threadNo;
 
@@ -253,23 +212,15 @@ public class ImageLoader {
                     if(i%500 == 0)
                         System.out.println(threadNo+":"+i);
                     Random rand = new Random();
-                    int randomImage = rand.nextInt(images.rows);
+                    int randomImage = rand.nextInt(images.length);
                     int randomY = rand.nextInt(height - patchRows + 1);
                     int randomX = rand.nextInt(width - patchCols + 1);
-                    int imageSize = width * height;
-                    DoubleMatrix patch = null;
                     for (int j = 0; j < channels; j++) {
-                        DoubleMatrix channel = images.getRange(randomImage, randomImage + 1, j * imageSize, (j + 1) * imageSize);
-                        channel = channel.reshape(width, height);
+                        DoubleMatrix channel = images[randomImage][j];
                         channel = channel.getRange(randomY, randomY + patchRows, randomX, randomX + patchCols);
                         channel = channel.reshape(1, patchRows * patchCols);
-                        if (patch == null) {
-                            patch = channel;
-                        } else {
-                            patch = DoubleMatrix.concatHorizontally(patch, channel);
-                        }
+                        patches[threadNo * count + i][j] = channel;
                     }
-                    patches.putRow(threadNo * count + i, patch);
                 }
             }
         }
@@ -282,34 +233,44 @@ public class ImageLoader {
         }
         executor.shutdown();
         while(!executor.isTerminated());
-        return normalizeData(patches);
+        return new DataContainer(normalizeData(patches));
     }
 
 
 	
-	public static DoubleMatrix normalizeData(DoubleMatrix data) {
-		DoubleMatrix mean = data.rowMeans();
-		data.subiColumnVector(mean);
-		DoubleMatrix squareData = data.mul(data);
-		
-		double var = squareData.mean();
+	public static DoubleMatrix[][] normalizeData(DoubleMatrix[][] data) {
+        double var = 0;
+        for(int i = 0; i < data.length; i++) {
+            double mean = 0;
+            for(int j = 0; j < data[i].length; j++) {
+                mean += data[i][j].mean();
+            }
+            for(int j = 0; j < data[i].length; j++) {
+                data[i][j].subi(mean);
+                var += data[i][j].mul(data[i][j]).mean()/data[i].length;
+            }
+        }
+        var /= data.length;
+
 		double stdev = Math.sqrt(var);
 		double pstd = 3 * stdev;
-		for(int i = 0; i < data.rows; i++) {
-			for(int j = 0; j < data.columns; j++) {
-				double x = data.get(i, j);
-				double val = x<pstd?x:pstd;
-				val = val>-pstd?val:-pstd;
-				val /= pstd;
-				data.put(i, j, val);
+		for(int i = 0; i < data.length; i++) {
+			for(int j = 0; j < data[i].length; j++) {
+                for(int k = 0; k < data[i][j].length; k++) {
+                    double x = data[i][j].get(k);
+                    double val = x < pstd ? x : pstd;
+                    val = val > -pstd ? val : -pstd;
+                    val /= pstd;
+                    data[i][j].put(k, val);
+                }
 			}
 		}
-		data.addi(1).muli(.4).add(0.1);
+		//data.addi(1).muli(.4).add(0.1);
 		return data;
 	}
 	
-	public DoubleMatrix getImages() {
-		return images;
+	public DataContainer getImages() {
+		return new DataContainer(images);
 	}
 	
 	public DoubleMatrix getLabels() {

@@ -7,7 +7,7 @@ import numerical.LBFGS.ExceptionWithIflag;
 import org.jblas.DoubleMatrix;
 
 public class NeuralNetwork {
-	private SparseAutoencoder sae;
+	/*private SparseAutoencoder sae;
 	private SoftmaxClassifier sc;
 	
 	public NeuralNetwork(SparseAutoencoder sae, SoftmaxClassifier sc) {
@@ -24,5 +24,5 @@ public class NeuralNetwork {
 	public int[] compute(DoubleMatrix input) {
 		DoubleMatrix features = sae.compute(input);
 		return sc.computeResults(features);
-	}
+	}*/
 }

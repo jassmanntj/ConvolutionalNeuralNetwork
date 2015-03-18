@@ -11,7 +11,7 @@ public class TestConvLayer {
 
 	@Test
 	public void test() {
-		DoubleMatrix currentImage = new DoubleMatrix(1, 60*80*3);
+		/*DoubleMatrix currentImage = new DoubleMatrix(1, 60*80*3);
 		for(int i = 0; i < currentImage.columns; i++) {
 			currentImage.put(0,i, 1.0/64);
 		}
@@ -25,7 +25,7 @@ public class TestConvLayer {
 		DoubleMatrix2D res2 = c2.compute(ci);
 		
 		System.out.println(res1);
-		System.out.println(res2);
+		System.out.println(res2);*/
 	}
 
 }

@@ -146,7 +146,7 @@ public class Utils {
     public static DoubleMatrix activationGradient(int type, DoubleMatrix z, double a, DoubleMatrix delta) {
         switch(type) {
             case SIGMOID:
-                return delta.muli(sigmoidGradient(sigmoid(z)));
+                return delta.muli(sigmoidGradient(z));
             case PRELU:
                 return delta.muli(preluGradient(z, a));
             case RELU:
@@ -158,20 +158,36 @@ public class Utils {
         }
     }
 
-    public static double aGrad(int type, DoubleMatrix result) {
-        return aGrad(type, result, null);
+    public static double aGrad(int type, DoubleMatrix result, double a) {
+        return aGrad(type, result, null, a);
     }
 
-    public static double aGrad(int type, DoubleMatrix result, DoubleMatrix delta) {
+    public static double aGrad(int type, DoubleMatrix result, DoubleMatrix delta, double a) {
         switch(type) {
             case PRELU:
                 if(delta != null) return result.le(0).mul(result).mul(delta).mean();
-                else return result.le(0).mul(result).mean();
+                else return result.le(0).mul(result).mean()/a;
             case SIGMOID: return 0;
             case RELU: return 0;
             case NONE: return 0;
             default: return 0;
         }
+    }
+
+    public static DoubleMatrix flatten(DoubleMatrix[][] z) {
+        DoubleMatrix images = null;
+        for(int i = 0; i < z.length; i++) {
+            DoubleMatrix image = null;
+            for(int j = 0; j < z[i].length; j++) {
+                for(int k = 0; k < z[i][j].rows; k++) {
+                    if(image == null) image = z[i][j].getRow(k);
+                    else image = DoubleMatrix.concatHorizontally(image, z[i][j].getRow(k));
+                }
+            }
+            if(images == null) images = image;
+            else images = DoubleMatrix.concatVertically(images, image);
+        }
+        return images;
     }
 
     public static DoubleMatrix activationFunction(int type, DoubleMatrix z) {
@@ -223,29 +239,29 @@ public class Utils {
         return a.neg().add(1).mul(a);
 	}
 	
-	public static int[][] computeResults(DoubleMatrix result) {
-		int[][] results = new int[result.rows][3];
-		for(int i = 0; i < result.rows; i++) {
+	public static int[][] computeResults(DoubleMatrix[][] result) {
+		int[][] results = new int[result.length][3];
+		for(int i = 0; i < result.length; i++) {
 			double current1 = 0;
 			double current2 = 0;
 			double current3 = 0;
-			for(int j = 0; j < result.columns; j++) {
-				if(result.get(i,j) > current1) {
+			for(int j = 0; j < result[i][0].length; j++) {
+				if(result[i][0].get(j) > current1) {
 					current3 = current2;
 					current2 = current1;
-					current1 = result.get(i,j);
+					current1 = result[i][0].get(j);
 					results[i][2] = results[i][1];
 					results[i][1] = results[i][0];
 					results[i][0] = j;
 				}
-				else if(result.get(i,j) > current2) {
+				else if(result[i][0].get(j) > current2) {
 					current3 = current2;
-					current2 = result.get(i,j);
+					current2 = result[i][0].get(j);
 					results[i][2] = results[i][1];
 					results[i][1] = j;
 				}
-				else if(result.get(i,j) > current3) {
-					current3 = result.get(i,j);
+				else if(result[i][0].get(j) > current3) {
+					current3 = result[i][0].get(j);
 					results[i][2] = j;
 				}
 				

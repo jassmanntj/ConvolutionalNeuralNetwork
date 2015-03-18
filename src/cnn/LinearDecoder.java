@@ -65,10 +65,13 @@ public class LinearDecoder extends NeuralNetworkLayer implements DiffFunction{
 	private void initializeParams() {
 		double r = Math.sqrt(6)/Math.sqrt(hiddenSize+inputSize+1);
 		theta1 = DoubleMatrix.rand(inputSize, hiddenSize).muli(2*r).subi(r);
+        tVelocity = DoubleMatrix.zeros(inputSize, hiddenSize);
 		theta2 = DoubleMatrix.rand(hiddenSize, inputSize).muli(2*r).subi(r);
 		bias1 = DoubleMatrix.zeros(1, hiddenSize);
+        bVelocity = DoubleMatrix.zeros(1, hiddenSize);
 		bias2 = DoubleMatrix.zeros(1, inputSize);
         a1 =  new DoubleMatrix(1,1);
+        aVelocity = DoubleMatrix.zeros(1,1);
         a1.put(0,0,0.25);
         a2 = new DoubleMatrix(1, 1);
         a2.put(0,0,0.25);
@@ -86,7 +89,7 @@ public class LinearDecoder extends NeuralNetworkLayer implements DiffFunction{
 		return bias1;
 	}
 	
-	private DoubleMatrix computeNumericalGradient(DoubleMatrix input, DoubleMatrix output) {
+	private DoubleMatrix computeNumericalGradient(DataContainer input, DoubleMatrix output) {
 		double epsilon = .0001;
 		DoubleMatrix compiledMatrix = DoubleMatrix.zeros(1, theta1.length+theta2.length+bias1.length+bias2.length);
 		for(int i = 0; i < compiledMatrix.length; i++) {
@@ -140,8 +143,9 @@ public class LinearDecoder extends NeuralNetworkLayer implements DiffFunction{
 		return compiledMatrix;
 	}
 	
-	protected CostResult[] cost(DoubleMatrix input, DoubleMatrix theta1, DoubleMatrix theta2, DoubleMatrix bias1, DoubleMatrix bias2) {
-		DoubleMatrix[] result = feedForward(input, theta1, theta2, bias1, bias2);
+	protected CostResult[] cost(DataContainer in, DoubleMatrix theta1, DoubleMatrix theta2, DoubleMatrix bias1, DoubleMatrix bias2) {
+		DoubleMatrix input = in.getData();
+        DoubleMatrix[] result = feedForward(input, theta1, theta2, bias1, bias2);
 		DoubleMatrix[] thetaGrad = new DoubleMatrix[2];
 		thetaGrad[0] = DoubleMatrix.zeros(theta1.rows, theta1.columns);
 		thetaGrad[1] = DoubleMatrix.zeros(theta2.rows, theta2.columns);
@@ -202,8 +206,8 @@ public class LinearDecoder extends NeuralNetworkLayer implements DiffFunction{
 		biasGrad[0] = delta2.columnMeans();
 
         //agrad
-        double a2grad = Utils.aGrad(layer2, result[2]);
-        double a1grad = Utils.aGrad(layer1, result[0], delta2);
+        double a2grad = Utils.aGrad(layer2, result[2], a2.get(0));
+        double a1grad = Utils.aGrad(layer1, result[0], delta2, a1.get(0));
 
 		CostResult[] results = new CostResult[2];
 		results[0] = new CostResult(0, 0, thetaGrad[0], biasGrad[0], delta2, a1grad);
@@ -211,11 +215,12 @@ public class LinearDecoder extends NeuralNetworkLayer implements DiffFunction{
 		return results;
 	}
 
-    public DoubleMatrix backPropagation(DoubleMatrix[] results, int layer, DoubleMatrix y, double momentum, double alpha) {
-        DoubleMatrix delta = y.mmul(theta2.transpose());
+    public DoubleMatrix backPropagation(DataContainer[] result, int layer, DoubleMatrix y, double momentum, double alpha) {
+        DoubleMatrix delta = y.mmul(theta1.transpose());
+        DoubleMatrix results = result[layer].getData();
         if(layer1 == Utils.SIGMOID) {
-            DoubleMatrix betaTerm = DoubleMatrix.zeros(1,results[layer].columns);
-            DoubleMatrix means = Utils.activationFunction(layer1, results[layer], a1.get(0)).columnMeans();
+            DoubleMatrix betaTerm = DoubleMatrix.zeros(1,results.columns);
+            DoubleMatrix means = Utils.activationFunction(layer1, results, a1.get(0)).columnMeans();
             int i = 0;
             for (double rhohat : means.data) {
                 double bterm = beta * (-rho / rhohat + (1 - rho) / (1 - rhohat));
@@ -224,13 +229,13 @@ public class LinearDecoder extends NeuralNetworkLayer implements DiffFunction{
             delta.addiRowVector(betaTerm);
         }
         //delta2
-        Utils.activationGradient(layer1, results[layer], a1.get(0), delta);
-        DoubleMatrix thetaGrad = results[layer-1].transpose().mmul(delta);
-        thetaGrad.divi(results[layer-1].rows);
+        DoubleMatrix prevResult = result[layer-1].getData();
+        Utils.activationGradient(layer1, prevResult, a1.get(0), delta);
+        DoubleMatrix thetaGrad = prevResult.transpose().mmul(y);
+        thetaGrad.divi(prevResult.rows);
         thetaGrad.addi(theta1.mul(lambda));
-        DoubleMatrix biasGrad = delta.columnMeans();
-        double aGrad = Utils.aGrad(layer1, results[layer], delta);
-
+        DoubleMatrix biasGrad = y.columnMeans();
+        double aGrad = Utils.aGrad(layer1, prevResult, delta, a1.get(0));
         epsilon = alpha /100;
         tVelocity.muli(momentum).addi(thetaGrad.mul(alpha));
         bVelocity.muli(momentum).addi(biasGrad.mul(alpha));
@@ -261,7 +266,7 @@ public class LinearDecoder extends NeuralNetworkLayer implements DiffFunction{
 		//b1grad
 		DoubleMatrix biasGrad = delta3.columnMeans();
 
-        double aGrad = Utils.aGrad(layer1, input.mmul(theta1)) * lastAGrad;
+        double aGrad = Utils.aGrad(layer1, input.mmul(theta1), a1.get(0)) * lastAGrad;
 		
 		return new CostResult(0, 0, thetaGrad, biasGrad, delta2, aGrad);
 	}
@@ -289,7 +294,8 @@ public class LinearDecoder extends NeuralNetworkLayer implements DiffFunction{
 	}
 
 
-    public void miniBatchGradientDescent(DoubleMatrix input, int iterations, final double mom, int batchSize) {
+    public void miniBatchGradientDescent(DataContainer in, int iterations, final double mom, int batchSize) {
+        DoubleMatrix input = in.getData();
         System.out.println("INPUT Rows: "+input.rows+" Cols: "+input.columns);
         System.out.println("Starting gradient descent with " + iterations + " iterations.");
         System.out.println("-----");
@@ -313,7 +319,7 @@ public class LinearDecoder extends NeuralNetworkLayer implements DiffFunction{
                 this.momentum = momentum;
             }
             public void run() {
-                CostResult[] result = cost(batch, theta1, theta2, bias1, bias2);
+                CostResult[] result = cost(new DataContainer(batch), theta1, theta2, bias1, bias2);
                 t1Velocity.muli(momentum).addi(result[0].thetaGrad.mul(alpha));
                 t2Velocity.muli(momentum).addi(result[1].thetaGrad.mul(alpha));
                 b1Velocity.muli(momentum).addi(result[0].biasGrad.mul(alpha));
@@ -332,7 +338,7 @@ public class LinearDecoder extends NeuralNetworkLayer implements DiffFunction{
         for(int i = 0; i < iterations; i++) {
             System.out.println(i);
             if(i%10==0) {
-                CostResult[] result = cost(input, theta1, theta2, bias1, bias2);
+                CostResult[] result = cost(in, theta1, theta2, bias1, bias2);
                 System.out.println("Cost "+i+": " + result[1].cost+" --- " + result[1].cost2);
                 System.out.println("A1: "+a1.get(0)+" ---- A2: "+a2.get(0));
             }
@@ -348,55 +354,12 @@ public class LinearDecoder extends NeuralNetworkLayer implements DiffFunction{
             executor.shutdown();
             while(!executor.isTerminated());
         }
-        CostResult[] result = cost(input, theta1, theta2, bias1, bias2);
+        CostResult[] result = cost(in, theta1, theta2, bias1, bias2);
         System.out.println("Final Cost: " + result[1].cost);
     }
 	
 	
-	public void gradientDescent(DoubleMatrix input, DoubleMatrix output, int iterations) {
-		System.out.println("INPUT Rows: "+input.rows+" Cols: "+input.columns);
-		System.out.println("Starting gradient descent with " + iterations + " iterations.");
-		System.out.println("-----");
-		for(int i = 0; i < iterations; i++) {
-			CostResult[] result = cost(input, theta1, theta2, bias1, bias2);
-			if(DEBUG) {
-				DoubleMatrix compiledGrads = computeNumericalGradient(input, output);
-				DoubleMatrix gradMin = compiledGrads.dup();
-				DoubleMatrix gradAdd = compiledGrads.dup();
-				DoubleMatrix compiledResults = DoubleMatrix.zeros(1,result[0].thetaGrad.length+result[1].thetaGrad.length+result[0].biasGrad.length+result[1].biasGrad.length);
-				for(int j = 0; j < compiledResults.length; j++) {
-					if(j < result[0].thetaGrad.length) {
-						int k = j/result[0].thetaGrad.columns;
-						int l = j%result[0].thetaGrad.columns;
-						compiledResults.put(0,j,result[0].thetaGrad.get(k,l));
-					}
-					else if(j < result[0].thetaGrad.length + result[1].thetaGrad.length) {
-						int k = (j-result[0].thetaGrad.length)/result[1].thetaGrad.columns;
-						int l = (j-result[0].thetaGrad.length)%result[1].thetaGrad.columns;
-						compiledResults.put(0,j,result[1].thetaGrad.get(k,l));
-					}
-					else if(j < result[0].thetaGrad.length + result[1].thetaGrad.length + result[0].biasGrad.length) {
-						int k = (j-result[0].thetaGrad.length-result[1].thetaGrad.length)/result[0].biasGrad.columns;
-						int l = (j-result[0].thetaGrad.length-result[1].thetaGrad.length)%result[0].biasGrad.columns;
-						compiledResults.put(0,j,result[0].biasGrad.get(k,l));
-					}
-					else if(j < result[0].thetaGrad.length + result[1].thetaGrad.length + result[0].biasGrad.length + result[1].biasGrad.length) {
-						int k = (j-result[0].thetaGrad.length-result[1].thetaGrad.length - result[0].biasGrad.length)/result[1].biasGrad.columns;
-						int l = (j-result[0].thetaGrad.length-result[1].thetaGrad.length - result[0].biasGrad.length)%result[1].biasGrad.columns;
-						compiledResults.put(0,j,result[1].biasGrad.get(k,l));
-					}
-				}
-				gradMin.subi(compiledResults);
-				gradAdd.addi(compiledResults);
-				System.out.println("Diff1: "+gradMin.norm2()/gradAdd.norm2());
-			}
-			System.out.println("Interation " + i + " Cost: " + result[1].cost);
-			theta1.addi(result[0].thetaGrad.mul(-alpha));
-			theta2.addi(result[1].thetaGrad.mul(-alpha));
-			bias1.addi(result[0].biasGrad.mul(-alpha));
-			bias2.addi(result[1].biasGrad.mul(-alpha));
-		}
-	}
+
 	
 	private DoubleMatrix[] feedForward(DoubleMatrix patches, DoubleMatrix theta1, DoubleMatrix theta2, DoubleMatrix bias1, DoubleMatrix bias2) {
 		DoubleMatrix[] result = new DoubleMatrix[4];
@@ -417,8 +380,8 @@ public class LinearDecoder extends NeuralNetworkLayer implements DiffFunction{
 		return result;
 	}
 
-    public DoubleMatrix feedForward(DoubleMatrix input) {
-        return input.mmul(theta1).addColumnVector(bias1);
+    public DataContainer feedForward(DataContainer input) {
+        return compute(input);
     }
 
 	
@@ -443,48 +406,6 @@ public class LinearDecoder extends NeuralNetworkLayer implements DiffFunction{
 			e.printStackTrace();
 		}
 		
-	}
-	
-	public DoubleMatrix loadTheta(String filename, DoubleMatrix input) {
-		try {
-			FileReader fr = new FileReader(filename);
-			@SuppressWarnings("resource")
-			BufferedReader reader = new BufferedReader(fr);
-			String[] data = reader.readLine().split(",");
-			assert data.length == theta1.data.length;
-			for(int i = 0; i < data.length; i++) {
-				theta1.data[i] = Double.parseDouble(data[i]);
-			}
-			data = reader.readLine().split(",");
-			assert data.length == bias1.data.length;
-			for(int i = 0; i < data.length; i++) {
-				bias1.data[i] = Double.parseDouble(data[i]);
-			}
-			//visualize(patchRows, patchColumns, (int)Math.sqrt(theta1.columns), filename.replace(".csv", ".png"));
-		}
-		catch(IOException e) {
-			e.printStackTrace();
-		}
-		return compute(input);
-	}
-	public void loadTheta(String filename) {
-		try {
-			FileReader fr = new FileReader(filename);
-			@SuppressWarnings("resource")
-			BufferedReader reader = new BufferedReader(fr);
-			String[] data = reader.readLine().split(",");
-			assert data.length == theta1.data.length+bias1.data.length;
-			for(int i = 0; i < theta1.data.length; i++) {
-				theta1.data[i] = Double.parseDouble(data[i]);
-			}
-			data = reader.readLine().split(",");
-			for(int i = 0; i < bias1.data.length; i++) {
-				bias1.data[i] = Double.parseDouble(data[i]);
-			}
-		}
-		catch(IOException e) {
-			e.printStackTrace();
-		}
 	}
 
 	public void loadLayer(String filename) {
@@ -541,10 +462,10 @@ public class LinearDecoder extends NeuralNetworkLayer implements DiffFunction{
 		}
 	}
 	
-	public DoubleMatrix compute(DoubleMatrix input) {
-		DoubleMatrix result = input.mmul(theta1);
+	public DataContainer compute(DataContainer input) {
+		DoubleMatrix result = input.getData().mmul(theta1);
 		result.addiRowVector(bias1);
-        return Utils.activationFunction(Utils.SIGMOID, result);
+        return new DataContainer(Utils.activationFunction(layer1, result));
 	}
 
 	public void visualize(int rows, int columns, int images, String filename) throws IOException {
@@ -595,7 +516,7 @@ public class LinearDecoder extends NeuralNetworkLayer implements DiffFunction{
 		System.arraycopy(dTheta, theta1.data.length+theta2.data.length+bias1.data.length, bias2.data, 0, bias2.data.length);
         a2.put(0,dTheta[dTheta.length-1]);
         a1.put(0,dTheta[dTheta.length-2]);
-		currentCost = cost(input, theta1, theta2, bias1, bias2);
+		currentCost = cost(new DataContainer(input), theta1, theta2, bias1, bias2);
 		double[] derivative = new double[theta1.length+theta2.length+bias1.length+bias2.length+2];
 		System.arraycopy(currentCost[0].thetaGrad.data, 0, derivative, 0, theta1.data.length);
 		System.arraycopy(currentCost[1].thetaGrad.data, 0, derivative, theta1.data.length, theta2.data.length);
@@ -606,7 +527,7 @@ public class LinearDecoder extends NeuralNetworkLayer implements DiffFunction{
 		return derivative;
 	}
 
-	public DoubleMatrix train(DoubleMatrix input, DoubleMatrix output, int iterations) {
+	public DataContainer train(DataContainer input, DoubleMatrix output, int iterations) {
         //alpha = 1.0/(input.rows*input.columns);
         //alpha = 0.01;
         miniBatchGradientDescent(input, iterations, 0.95, 128);
@@ -615,7 +536,7 @@ public class LinearDecoder extends NeuralNetworkLayer implements DiffFunction{
         System.out.println("A1: "+a1.get(0)+" -- A2: " + a2.get(0) + " -- Cost: " +currentCost[1].cost);
         //miniBatchGradientDescent(input, iterations, 0.9, 128);
         try{
-            visualize(patchRows, patchColumns, (int)Math.ceil(Math.sqrt(hiddenSize)), "feat"+input.columns+".png");
+            visualize(patchRows, patchColumns, (int)Math.ceil(Math.sqrt(hiddenSize)), "feat"+input.getData().columns+".png");
         } catch (IOException e) {
             e.printStackTrace();
         }
