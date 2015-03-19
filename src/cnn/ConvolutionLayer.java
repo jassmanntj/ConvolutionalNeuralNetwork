@@ -239,12 +239,17 @@ public class ConvolutionLayer extends NeuralNetworkLayer {
     }
 
     @Override
+<<<<<<< HEAD
     public DoubleMatrix backPropagation(DataContainer[] results, int layer, DoubleMatrix y, double momentum, double alpha) {
         System.out.println(results[layer-1].getDataArray().length+":"+results[layer-1].getDataArray()[0].length+":"+results[layer-1].getDataArray()[0][0].rows+":"+results[layer-1].getDataArray()[0][0].columns);
         System.out.println(y.rows+":"+ y.columns);
         DoubleMatrix delta = Utils.flatten(oonv(results[layer-1].getDataArray(), y));
         whitenedTheta.subi(delta);
         return delta;
+=======
+    public DoubleMatrix backPropagation(DoubleMatrix[] results, int layer, DoubleMatrix y, double momentum, double alpha) {
+        DoubleMatrix delta = oonv(results[layer-1], y);
+>>>>>>> parent of c90cee4... Full network backprop implemented (not tested)
     }
 
     public void writeLayer(String filename) {
