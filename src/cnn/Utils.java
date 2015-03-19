@@ -19,8 +19,13 @@ public class Utils {
     public static final int PRELU = 2;
     public static final int RELU = 3;
 	public static DoubleMatrix calculateZCAWhite(DoubleMatrix input, DoubleMatrix meanPatch, double epsilon) {
+<<<<<<< HEAD
         DoubleMatrix sigma = input.subRowVector(meanPatch);
         sigma = sigma.transpose().mmul(sigma);
+=======
+		DoubleMatrix sigma = input.subRowVector(meanPatch);
+		sigma = sigma.transpose().mmul(sigma);
+>>>>>>> parent of e6651bd... Working version
 		sigma.divi(input.rows);
 		DoubleMatrix[] svd = Singular.fullSVD(sigma);
 		DoubleMatrix ZCAWhite = svd[1];

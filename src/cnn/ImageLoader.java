@@ -238,6 +238,7 @@ public class ImageLoader {
 
 
 	
+<<<<<<< HEAD
 	public static DoubleMatrix[][] normalizeData(DoubleMatrix[][] data) {
         double var = 0;
         for(int i = 0; i < data.length; i++) {
@@ -252,6 +253,48 @@ public class ImageLoader {
         }
         var /= data.length;
 
+=======
+	public static DoubleMatrix sample(int patchSize, int numPatches, DoubleMatrix images, int width, int height, int channels) {
+		System.out.println(images.rows+"x"+images.columns);
+		Random rand = new Random();
+		DoubleMatrix patches = null;
+		for(int i = 0; i < numPatches; i++) {
+			if(i%1000==0)
+				System.out.println(i);
+			int randomImage = rand.nextInt(images.rows);
+			int randomY = rand.nextInt(height-patchSize+1);
+			int randomX = rand.nextInt(width-patchSize+1);
+			int imageSize = width*height;
+			DoubleMatrix patch = null;
+			for(int j = 0; j < channels; j++) {
+				DoubleMatrix channel = images.getRange(randomImage, randomImage+1, j*imageSize, (j+1)*imageSize);
+				channel = channel.reshape(width, height);
+				channel = channel.getRange(randomY, randomY+patchSize, randomX, randomX+patchSize);
+				channel = channel.reshape(1,  patchSize*patchSize);
+				if(patch == null) {
+					patch = channel;
+				}
+				else {
+					patch = DoubleMatrix.concatHorizontally(patch, channel);
+				}
+			}
+			if(patches == null) {
+				patches = patch;
+			}
+			else {
+				patches = DoubleMatrix.concatVertically(patches, patch);
+			}
+		}
+		return patches;
+	}
+	
+	public DoubleMatrix normalizeData(DoubleMatrix data) {
+		DoubleMatrix mean = data.rowMeans();
+		data.subiColumnVector(mean);
+		DoubleMatrix squareData = data.mul(data);
+		
+		double var = squareData.mean();
+>>>>>>> parent of e6651bd... Working version
 		double stdev = Math.sqrt(var);
 		double pstd = 3 * stdev;
 		for(int i = 0; i < data.length; i++) {

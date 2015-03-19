@@ -34,9 +34,15 @@ import com.sun.jndi.ldap.pool.Pool;
 import org.jblas.DoubleMatrix;
 
 public class LeafCNN {
+<<<<<<< HEAD
 	private static final boolean load = false;
 	DataContainer images;
 	DataContainer photoTrain;
+=======
+	private static final boolean load = true;
+	DoubleMatrix images;
+	DoubleMatrix photoTrain;
+>>>>>>> parent of e6651bd... Working version
 	DoubleMatrix labels;
 	DoubleMatrix photoLabels;
 	DoubleMatrix testImages;
@@ -49,10 +55,17 @@ public class LeafCNN {
 	}
 
 	public void run() throws Exception {
+<<<<<<< HEAD
 		int patchSize = 9;
 		int poolSize = 4;
 		int numPatches = 200;
 		int hiddenSize = 250;
+=======
+		int patchSize = 11;
+		int poolSize = 10;
+		int numPatches = 64;
+		int hiddenSize = 200;
+>>>>>>> parent of e6651bd... Working version
 		int imageRows = 80;
 		int imageColumns = 60;
 		double sparsityParam = 0.035;
@@ -60,6 +73,7 @@ public class LeafCNN {
 		double beta = 5;
 		double alpha = 1e-2;
 		int channels = 3;
+<<<<<<< HEAD
         int iterations = 100;
 
         //CL2
@@ -71,14 +85,21 @@ public class LeafCNN {
         int channels2 = numPatches;
 
         String resFile = "Final"+patchSize+"."+numPatches+"."+poolSize+"."+patchSize2+"."+numPatches2+"."+poolSize2+".10";
+=======
+		String resFile = "Final"+patchSize+"."+numPatches+"."+poolSize+"."+hiddenSize;
+>>>>>>> parent of e6651bd... Working version
 		
 		ImageLoader loader = new ImageLoader();
 		File folder = new File("C:/Users/jassmanntj/Desktop/TrainImages");
         HashMap<String, Double> labelMap = loader.getLabelMap(folder);
 
 		if(!load) {
+<<<<<<< HEAD
 			loader.loadFolder(folder, channels, imageColumns, imageRows, labelMap);
             //loader.randomizeImages(1000);
+=======
+			loader.loadFolder(folder, 3, 60, 80, labelMap);
+>>>>>>> parent of e6651bd... Working version
 			images = loader.getImages();
 			photoTrain = loader.getPhotoImages();
 			labels = loader.getLabels();
@@ -97,6 +118,7 @@ public class LeafCNN {
 
 
 		ConvolutionLayer cl = new ConvolutionLayer(channels, patchSize, imageRows, imageColumns, poolSize, numPatches, sparsityParam, lambda, beta, alpha, true);
+<<<<<<< HEAD
 		//ConvolutionLayer cl2 = new ConvolutionLayer(channels2, patchSize2, imageRows2, imageColumns2, poolSize2, numPatches2, sparsityParam, lambda, beta, alpha, true);
 		LinearDecoder ae2 = new LinearDecoder(cl.getOutputRows(), cl.getOutputColumns(), numPatches, hiddenSize, sparsityParam, lambda, beta, alpha/50000, Utils.PRELU, Utils.NONE);
         PoolingLayer pl = new PoolingLayer(poolSize, numPatches);
@@ -104,6 +126,13 @@ public class LeafCNN {
 		//LinearDecoder[] saes = {ae2};
 		//DeepNN dn = new DeepNN(saes, sc);
 		NeuralNetworkLayer[] nnl = {cl, pl, ae2, sc};
+=======
+		SparseAutoencoder ae2 = new SparseAutoencoder(cl.getOutputSize(), hiddenSize, cl.getOutputSize(), sparsityParam, lambda, beta, alpha);
+		SoftmaxClassifier sc = new SoftmaxClassifier(1e-4);
+		SparseAutoencoder[] saes = {ae2};
+		DeepNN dn = new DeepNN(saes, sc);
+		NeuralNetworkLayer[] nnl = {cl, dn};
+>>>>>>> parent of e6651bd... Working version
 		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(nnl, resFile);
 		cnn.fineTune(images, labels, iterations, alpha, 16);
         DataContainer result = cnn.computeRes(images);
@@ -116,7 +145,7 @@ public class LeafCNN {
 /*
 		folder = new File("C:/Users/jassmanntj/Desktop/TestSort");
 		if(!load) {
-			loader.loadFolder(folder,channels,imageColumns, imageRows,labelMap);
+			loader.loadFolder(folder,3,60, 80,labelMap);
 			testImages = loader.getImages();
 			testLabels = loader.getLabels();
 			photoTest = loader.getPhotoImages();

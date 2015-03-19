@@ -47,10 +47,13 @@ public class ConvolutionLayer extends NeuralNetworkLayer {
 		this.beta = beta;
 		this.alpha = alpha;
 		this.whiten = whiten;
+<<<<<<< HEAD
         this.patchSize = patchDim*patchDim;
         double r = Math.sqrt(6)/Math.sqrt(patchRows*patchCols*channels+numPatches+1);
         this.whitenedTheta = DoubleMatrix.rand(patchRows*patchCols*channels, numPatches).muli(2*r).subi(r);
         this.whitenedBias = DoubleMatrix.zeros(1, numPatches);
+=======
+>>>>>>> parent of e6651bd... Working version
 	}
 
     public DoubleMatrix getA() {
@@ -123,8 +126,14 @@ public class ConvolutionLayer extends NeuralNetworkLayer {
 	private DoubleMatrix convolve() {
 		System.out.println("Starting Convolution");
 		int numFeatures = whitenedTheta.columns;
+<<<<<<< HEAD
 		this.resultRows = (imageRows-patchRows+1)/poolRows;
 		this.resultCols = (imageCols-patchCols+1)/poolCols;
+=======
+		this.resultRows = (imageRows-patchDim+1)/poolDim;
+		this.resultCols = (imageCols-patchDim+1)/poolDim;
+		this.patchSize = patchDim*patchDim;
+>>>>>>> parent of e6651bd... Working version
 		this.imageSize = imageRows*imageCols;
 		this.pooledFeatures = new DoubleMatrix(images.length, numFeatures * (resultRows * resultCols));
         //this.convolvedFeatures = new DoubleMatrix(images.rows, numFeatures * imageRows * imageCols);
@@ -213,8 +222,6 @@ public class ConvolutionLayer extends NeuralNetworkLayer {
 				}
 			}
 			line = reader.readLine().split(",");
-            whitenedBias = new DoubleMatrix(Integer.parseInt(line[0]), Integer.parseInt(line[1]));
-            line = reader.readLine().split(",");
 			for(int i = 0; i < whitenedBias.rows; i++) {
 				for(int j = 0; j < whitenedBias.columns; j++) {
 					whitenedBias.put(i, j, Double.parseDouble(line[i * whitenedBias.columns + j]));
@@ -294,6 +301,7 @@ public class ConvolutionLayer extends NeuralNetworkLayer {
 	}
 
 	@Override
+<<<<<<< HEAD
 	public DataContainer train(DataContainer input, DoubleMatrix output, int iterations) {
         //int inputSize = patchDim*patchDim*channels;
 		//SparseAutoencoder ae = new SparseAutoencoder(inputSize, numPatches, inputSize, sparsityParam, lambda, beta, alpha);
@@ -321,6 +329,27 @@ public class ConvolutionLayer extends NeuralNetworkLayer {
         /*} catch (IOException e) {
             e.printStackTrace();
         }*/
+=======
+	public DoubleMatrix train(DoubleMatrix input, DoubleMatrix output, int iterations) {
+		LinearDecoder ae = new LinearDecoder(patchSize, channels, numPatches, sparsityParam, lambda, beta, alpha);
+		DoubleMatrix patches = ImageLoader.sample(patchSize, numPatches, input, imageCols, imageRows, channels);
+		if(whiten) {
+			patches.divi(patches.max());
+			DoubleMatrix meanPatch = patches.columnMeans();
+			DoubleMatrix ZCAWhite = Utils.calculateZCAWhite(patches, meanPatch, 0.1);
+			patches = Utils.ZCAWhiten(patches, meanPatch, ZCAWhite);
+			ae.train(patches, patches, iterations);
+			DoubleMatrix previousTheta = ae.getTheta();
+			DoubleMatrix previousBias = ae.getBias();
+			whitenedTheta = ZCAWhite.mmul(previousTheta);
+			whitenedBias = previousBias.sub(meanPatch.mmul(whitenedTheta));
+		}
+		else {
+			ae.train(patches, patches, iterations);
+			this.whitenedTheta = ae.getTheta();
+			this.whitenedBias = ae.getBias();
+		}
+>>>>>>> parent of e6651bd... Working version
 		return compute(input);
 		
 	}
