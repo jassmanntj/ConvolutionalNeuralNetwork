@@ -12,10 +12,9 @@ import java.util.concurrent.Executors;
 public class PoolingLayer extends NeuralNetworkLayer {
     private int poolDimX;
     private int poolDimY;
-    private int stepX;
-    private int stepY;
     private int resultRows;
     private int resultCols;
+    private int channels;
 
     public DoubleMatrix getA() {
         return null;
@@ -25,15 +24,11 @@ public class PoolingLayer extends NeuralNetworkLayer {
     public PoolingLayer(int poolDim, int features) {
         this.poolDimX = poolDim;
         this.poolDimY = poolDim;
-        this.stepX = poolDim;
-        this.stepY = poolDim;
     }
 
     public PoolingLayer(int poolDimX, int poolDimY, int features) {
         this.poolDimX = poolDimX;
         this.poolDimY = poolDimY;
-        this.stepX = poolDimX;
-        this.stepY = poolDimY;
     }
 
     public DataContainer feedForward(DataContainer input) {
@@ -48,8 +43,9 @@ public class PoolingLayer extends NeuralNetworkLayer {
 
     public DataContainer compute(DataContainer in) {
         DoubleMatrix[][] input = in.getDataArray();
-        this.resultRows = input[0][0].rows/stepX;
-        this.resultCols = input[0][0].columns/stepY;
+        this.resultRows = input[0][0].rows/poolDimY;
+        this.resultCols = input[0][0].columns/poolDimX;
+        this.channels = input[0].length;
         DoubleMatrix pooledFeatures[][] = new DoubleMatrix[input.length][input[0].length];
 
         for(int imageNum = 0; imageNum < input.length; imageNum++) {
@@ -64,7 +60,7 @@ public class PoolingLayer extends NeuralNetworkLayer {
         DoubleMatrix pooledFeature = new DoubleMatrix(resultRows, resultCols);
         for(int poolRow = 0; poolRow < resultRows; poolRow++) {
             for(int poolCol = 0; poolCol < resultCols; poolCol++) {
-                DoubleMatrix patch = convolvedFeature.getRange(poolRow*stepX, poolRow*stepX+poolDimX, poolCol*stepY, poolCol*stepY+poolDimY);
+                DoubleMatrix patch = convolvedFeature.getRange(poolRow*poolDimX, poolRow*poolDimX+poolDimX, poolCol*poolDimY, poolCol*poolDimY+poolDimY);
                 pooledFeature.put(poolRow, poolCol, patch.mean());
             }
         }
@@ -73,14 +69,20 @@ public class PoolingLayer extends NeuralNetworkLayer {
 
     private DoubleMatrix expand(DoubleMatrix in) {
         System.out.println(in.rows+"::"+in.columns);
-        DoubleMatrix expandedMatrix = new DoubleMatrix(in.rows*stepX, in.columns*stepY);
-        double scale = (poolDimX * poolDimX * poolDimY * poolDimY / (stepX * stepY));
+        DoubleMatrix expandedMatrix = new DoubleMatrix(in.rows*poolDimX, in.columns*poolDimY);
+        int srcRows = resultRows * poolDimY;
+        int srcCols = resultCols * poolDimX;
+        double scale = (poolDimX * poolDimY);
         for(int i = 0; i < in.rows; i++) {
-            for(int j = 0; j < in.columns; j++) {
-                double value = in.get(i,j)/scale;
-                for(int k = 0; k < poolDimY; k++) {
-                    for(int l = 0; l < poolDimX; l++) {
-                        expandedMatrix.put(i*stepY+k, j*stepX+l, expandedMatrix.get(i*stepY+k, j*stepX+l)+value);
+            for(int j = 0; j < this.channels; j++) {
+                for(int k = 0; k < resultRows; k++) {
+                    for(int l = 0; l < resultCols; l++) {
+                        double value = in.get(k, j*resultRows*resultCols+k*resultCols+j);
+                        for(int m = 0; m < poolDimY; m++) {
+                            for(int n = 0; n < poolDimX; n++) {
+                                expandedMatrix.put(i, j*srcRows*srcCols+(k+m)*srcCols+l+n, value);
+                            }
+                        }
                     }
                 }
             }

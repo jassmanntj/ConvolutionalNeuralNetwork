@@ -26,6 +26,8 @@ public class ConvolutionLayer extends NeuralNetworkLayer {
 	private DoubleMatrix whitenedTheta;
 	private DoubleMatrix whitenedBias;
 	private DoubleMatrix pooledFeatures;
+    private DoubleMatrix tVelocity;
+    private DoubleMatrix bVelocity;
 	private int patchSize;
 	private int imageSize;
 	private int resultRows;
@@ -237,6 +239,43 @@ public class ConvolutionLayer extends NeuralNetworkLayer {
     public DataContainer feedForward(DataContainer input) {
         return new DataContainer(oonv(input.getDataArray(), whitenedTheta));
     }
+/*
+    private DoubleMatrix bpConv(DoubleMatrix[][] a, DoubleMatrix[][] b) {
+
+    }
+
+    private DoubleMatrix[][] oonv(DoubleMatrix[][] input, DoubleMatrix features) {
+        System.out.println("Starting Convolution");
+        this.imageSize = imageRows*imageCols;
+        this.resultRows = (imageRows-patchRows+1);
+        this.resultCols = (imageCols-patchCols+1);
+        DoubleMatrix[][] convolvedFeatures = new DoubleMatrix[input.length][features.columns];
+        //DoubleMatrix convolvedFeatures = new DoubleMatrix(input.rows, features.columns * resultRows * resultCols);
+        for(int imageNum = 0; imageNum < input.length; imageNum++) {
+            System.out.println(imageNum);
+            DoubleMatrix[] currentImage = input[imageNum];
+            for (int featureNum = 0; featureNum < features.columns; featureNum++) {
+                DoubleMatrix convolvedFeature = convFeature(currentImage, features, featureNum);
+                convolvedFeatures[imageNum][featureNum] = convolvedFeature;
+                //convolvedFeature.reshape(1,convolvedFeature.length);
+                //convolvedImage = DoubleMatrix.concatHorizontally(convolvedImage, convolvedFeature);
+            }
+            //convolvedFeatures.putRow(imageNum, convolvedImage);
+        }
+        return convolvedFeatures;
+    }
+
+    public DoubleMatrix convFeature(DoubleMatrix[] currentImage, DoubleMatrix features, int featureNum) {
+        DoubleMatrix convolvedFeature = DoubleMatrix.zeros(imageRows-patchRows+1,imageCols - patchCols+1);
+        for(int channel = 0; channel < currentImage.length; channel++) {
+            DoubleMatrix feature = features.getRange(patchSize*channel, patchSize*channel+patchSize,featureNum, featureNum+1);
+            feature.reshape(patchRows, patchCols);
+            DoubleMatrix image = currentImage[channel];
+            DoubleMatrix conv = Utils.conv2d(image, feature);
+            convolvedFeature.addi(conv);
+        }
+        return Utils.sigmoid(convolvedFeature.add(features.get(featureNum)));
+    }*/
 
     @Override
     public DoubleMatrix backPropagation(DataContainer[] results, int layer, DoubleMatrix y, double momentum, double alpha) {
